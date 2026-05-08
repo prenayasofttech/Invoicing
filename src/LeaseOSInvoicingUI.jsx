@@ -165,7 +165,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
       for (const u of selected) {
         const rentAmount = Number(u.monthly_rent) || 0;
         const camAmount = Number(u.cam_charges) || 0;
-        const gstAmount = rentAmount * 0.18;
+        const gstAmount = (rentAmount + camAmount) * 0.18;
         const totalAmount = rentAmount + camAmount + gstAmount;
 
         const payload = {
@@ -381,16 +381,20 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
           <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => {
             if (selected.length > 0) {
               setPreviewInvoice({
-                invoice_no: "DRAFT-PREVIEW",
-                invoice_date: new Date().toISOString().split("T")[0],
+                invoice_no: `INV-${selected[0].units?.unit_number || "XX"}-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-001`,
+                invoice_date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+                due_date: new Date(Date.now() + 864000000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
                 billing_month: selectedMonth,
                 owner_name: selectedOwner,
                 tenant_name: selected[0].tenant?.brand_name || selected[0].tenant?.company_name || selected[0].tenant?.first_name || "—",
                 unit_no: selected[0].units?.unit_number,
+                project_name: projects.find(p => p.id === selectedProject)?.project_name || "Commercial Project",
+                area_sqft: selected[0].units?.chargeable_area || 0,
                 rent_amount: selected[0].monthly_rent,
-                gst_amount: Number(selected[0].monthly_rent) * 0.18,
-                total_amount: Number(selected[0].monthly_rent) * 1.18,
-                status: "Draft",
+                cam_amount: selected[0].cam_charges || 0,
+                gst_amount: (Number(selected[0].monthly_rent) + Number(selected[0].cam_charges || 0)) * 0.18,
+                total_amount: (Number(selected[0].monthly_rent) + Number(selected[0].cam_charges || 0)) * 1.18,
+                status: "OUTSTANDING",
                 isDraft: true
               });
               setActiveTab("Invoice Preview");
@@ -554,69 +558,131 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
     );
   }
 
+  const rent = Number(invoice.rent_amount) || 0;
+  const cam = Number(invoice.cam_amount) || 0;
+  const subTotal = rent + cam;
+  const cgst = subTotal * 0.09;
+  const sgst = subTotal * 0.09;
+  const grandTotal = subTotal + cgst + sgst;
+  const area = invoice.area_sqft || 0;
+  const rate = area > 0 ? rent / area : 0;
+  const camRate = area > 0 ? cam / area : 0;
+
+  const formattedDate = new Date(invoice.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formattedDueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "—";
+
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 sm:p-10 shadow-sm max-w-4xl mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">INVOICE</h2>
-          <p className="text-sm font-medium text-slate-500 mt-1">{invoice.invoice_no}</p>
-          <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${invoice.status === 'Paid' ? 'bg-green-100 text-green-700' : invoice.isDraft ? 'bg-slate-100 text-slate-700' : 'bg-rose-100 text-rose-700'}`}>
-            {invoice.status}
-          </span>
-        </div>
+    <>
+      <div className="mb-4 flex items-center justify-between px-2">
+        <p className="text-sm font-semibold text-slate-800">Invoice Preview</p>
         <div className="flex gap-2">
-          <button className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium" onClick={() => window.print()}>Download PDF</button>
-          {!invoice.isDraft && <button className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Send Email</button>}
-          <button className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium" onClick={() => setActiveTab("Invoice Register")}>Close</button>
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => window.print()}>Download PDF</button>
+          {!invoice.isDraft && <button className="rounded-md bg-[#009b7c] px-4 py-2 text-xs font-semibold text-white shadow-sm">Send Email</button>}
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700" onClick={() => setActiveTab("Invoice Register")}>Close</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-8 border-t border-b border-slate-100 py-6 mb-8 text-sm">
-        <div>
-          <p className="font-semibold text-slate-900 mb-2">Billed To:</p>
-          <p className="text-slate-700">{invoice.tenant_name}</p>
-          <p className="text-slate-500 mt-1">Unit: <span className="font-medium text-slate-700">{invoice.unit_no}</span></p>
-        </div>
-        <div className="text-right">
-          <p className="font-semibold text-slate-900 mb-2">Billing Details:</p>
-          <p className="text-slate-500">Date: <span className="font-medium text-slate-700">{invoice.invoice_date}</span></p>
-          <p className="text-slate-500">Month: <span className="font-medium text-slate-700">{invoice.billing_month}</span></p>
-          <p className="text-slate-500">Owner: <span className="font-medium text-slate-700">{invoice.owner_name}</span></p>
-        </div>
-      </div>
+      <section className="rounded-xl border border-slate-200 bg-white p-8 sm:p-12 shadow-sm max-w-5xl mx-auto" style={{ fontFamily: "Inter, sans-serif" }}>
 
-      <table className="w-full text-sm mb-8">
-        <thead className="bg-slate-50 border-b border-slate-200 text-left text-xs font-semibold uppercase text-slate-500">
-          <tr>
-            <th className="p-3">Description</th>
-            <th className="p-3 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          <tr>
-            <td className="p-3 py-4 text-slate-700">Rent for {invoice.billing_month}</td>
-            <td className="p-3 py-4 text-right font-medium text-slate-900">₹{Number(invoice.rent_amount).toLocaleString("en-IN")}</td>
-          </tr>
-          <tr>
-            <td className="p-3 py-4 text-slate-700">GST (18%)</td>
-            <td className="p-3 py-4 text-right font-medium text-slate-900">₹{Number(invoice.gst_amount).toLocaleString("en-IN")}</td>
-          </tr>
-        </tbody>
-        <tfoot className="border-t-2 border-slate-200 font-bold">
-          <tr>
-            <td className="p-3 text-right text-slate-900">Total</td>
-            <td className="p-3 text-right text-lg text-slate-900">₹{Number(invoice.total_amount).toLocaleString("en-IN")}</td>
-          </tr>
-        </tfoot>
-      </table>
-
-      {!invoice.isDraft && (
-        <div className="text-xs text-slate-500 border-t border-slate-100 pt-6">
-          <p>Please pay within 7 days of the invoice date.</p>
-          <p className="mt-1">This is a computer-generated document. No signature is required.</p>
+        {/* Top Header Section */}
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900" style={{ fontFamily: "Georgia, serif" }}>
+              {invoice.project_name || "Commercial Project"}
+            </h1>
+            <div className="mt-3 inline-block rounded bg-[#fef3c7] px-2 py-1 text-[10px] font-bold text-[#b45309] uppercase tracking-wider">
+              Tax Invoice
+            </div>
+            <div className="mt-4 text-xs text-slate-600 leading-relaxed">
+              <p>Management Co. Pvt Ltd</p>
+              <p>GSTIN: 06ABCN1234M1ZX</p>
+            </div>
+          </div>
+          <div className="text-right text-sm text-slate-600 space-y-1.5">
+            <p className="text-slate-400 text-xs tracking-wider uppercase mb-3">{invoice.invoice_no}</p>
+            <p><span className="font-semibold text-slate-900">Date:</span> {formattedDate}</p>
+            <p><span className="font-semibold text-slate-900">Due Date:</span> {formattedDueDate}</p>
+            <div className="mt-3">
+              <span className={`inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${invoice.status === 'Paid' ? 'bg-[#dcfce7] text-[#15803d]' : invoice.isDraft ? 'bg-slate-100 text-slate-600' : 'bg-[#fef3c7] text-[#b45309]'}`}>
+                {invoice.status}
+              </span>
+            </div>
+          </div>
         </div>
-      )}
-    </section>
+
+        {/* Bill To & On Behalf Of Section */}
+        <div className="grid grid-cols-2 gap-12 border-t border-slate-100 py-8 mb-4 text-sm">
+          <div>
+            <p className="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3">Bill To (Tenant)</p>
+            <p className="font-bold text-slate-900 text-base">{invoice.tenant_name}</p>
+            <p className="text-slate-500 mt-1">Unit {invoice.unit_no}, {invoice.project_name}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3">On Behalf Of (Owner)</p>
+            <p className="font-bold text-slate-900 text-base">{invoice.owner_name}</p>
+            <p className="text-slate-500 mt-1">Flat 704, DLF Phase 2</p>
+          </div>
+        </div>
+
+        {/* Invoice Table */}
+        <table className="w-full text-sm mb-6">
+          <thead className="bg-[#0f172a] text-white text-xs font-semibold">
+            <tr>
+              <th className="p-3 text-left w-12">#</th>
+              <th className="p-3 text-left">Description</th>
+              <th className="p-3 text-left">SAC</th>
+              <th className="p-3 text-right">Area</th>
+              <th className="p-3 text-right">Rate/Sqft</th>
+              <th className="p-3 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-slate-700">
+            {rent > 0 && (
+              <tr>
+                <td className="p-3 py-5 text-slate-500">1</td>
+                <td className="p-3 py-5">Fixed Rent - {invoice.billing_month}</td>
+                <td className="p-3 py-5 text-slate-500">997212</td>
+                <td className="p-3 py-5 text-right">{area > 0 ? area.toLocaleString("en-IN") : "—"}</td>
+                <td className="p-3 py-5 text-right">{rate > 0 ? `₹${rate.toFixed(2)}` : "—"}</td>
+                <td className="p-3 py-5 text-right font-medium text-slate-900">₹{rent.toLocaleString("en-IN")}</td>
+              </tr>
+            )}
+            {cam > 0 && (
+              <tr>
+                <td className="p-3 py-5 text-slate-500">{rent > 0 ? "2" : "1"}</td>
+                <td className="p-3 py-5">IFMS Contribution (Common Area)</td>
+                <td className="p-3 py-5 text-slate-500">997219</td>
+                <td className="p-3 py-5 text-right">{area > 0 ? area.toLocaleString("en-IN") : "—"}</td>
+                <td className="p-3 py-5 text-right">{camRate > 0 ? `₹${camRate.toFixed(2)}` : "—"}</td>
+                <td className="p-3 py-5 text-right font-medium text-slate-900">₹{cam.toLocaleString("en-IN")}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        {/* Totals Section */}
+        <div className="flex justify-end mb-12">
+          <div className="w-64 space-y-3 text-sm">
+            <div className="flex justify-between text-slate-700">
+              <span>Sub Total</span>
+              <span className="font-medium text-slate-900">₹{subTotal.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>CGST @ 9%</span>
+              <span>₹{cgst.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div className="flex justify-between text-slate-600 pb-3 border-b border-slate-200">
+              <span>SGST @ 9%</span>
+              <span>₹{sgst.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div className="flex justify-between text-lg font-bold text-slate-900 pt-2">
+              <span>Total</span>
+              <span>₹{grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 
