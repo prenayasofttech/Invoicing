@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import LeaseOSSidebar from "./LeaseOSSidebar";
-import { fetchInvoices, fetchCompanies, fetchProjects, fetchOwnersByCompanyAndProject, fetchLeasesForInvoicing, createInvoice } from "./supabaseClient";
+import { fetchInvoices, fetchCompanies, fetchProjects, fetchOwnersByCompanyAndProject, fetchLeasesForInvoicing, createInvoice, createCollection } from "./supabaseClient";
 
 function EmptyState({ message }) {
   return (
@@ -435,7 +435,6 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice }) {
     if (!window.confirm(`Settle invoice ${row.invoice_no} for ₹${Number(row.balance_amount).toLocaleString("en-IN")}?`)) return;
     setSettling(true);
     try {
-      const { createCollection } = await import("./supabaseClient");
       const amt = Number(row.balance_amount) || 0;
       await createCollection({
         receipt_no: `REC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
