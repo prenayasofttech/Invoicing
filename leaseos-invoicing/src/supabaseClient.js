@@ -240,6 +240,15 @@ export async function createInvoice(payload) {
   return data;
 }
 
+/** Delete an invoice */
+export async function deleteInvoice(invoiceId) {
+  const { error } = await supabase
+    .from("leaseos_invoices")
+    .delete()
+    .eq("id", invoiceId);
+  if (error) throw error;
+}
+
 /** Mark invoice as settled (full or partial) */
 export async function settleInvoice(invoiceId, collectedAmount) {
   const { data: inv, error: fetchErr } = await supabase
@@ -267,16 +276,21 @@ export async function settleInvoice(invoiceId, collectedAmount) {
 
 /** Outstanding invoices for one tenant party */
 export async function fetchOutstandingByTenant(tenantPartyId) {
-  const { data, error } = await supabase
+  let q = supabase
     .from("leaseos_invoices")
     .select(`
       id, invoice_no, invoice_date, billing_month,
       total_amount, collected_amount, balance_amount, status,
-      units(unit_number), projects(project_name)
+      tenant_party_id, owner_party_id, company_id, project_id, unit_id,
+      units(unit_number), projects(project_name),
+      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name)
     `)
-    .eq("tenant_party_id", tenantPartyId)
     .in("status", ["Outstanding", "Overdue", "Partial"])
     .order("invoice_date", { ascending: true });
+
+  if (tenantPartyId) q = q.eq("tenant_party_id", tenantPartyId);
+
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []).map((r) => ({
     ...r,
@@ -393,7 +407,7 @@ export async function fetchAgingRows(projectId) {
   let q = supabase
     .from("leaseos_invoices")
     .select(`
-      balance_amount, invoice_date,
+      id, invoice_no, company_id, project_id, unit_id, tenant_party_id, owner_party_id, balance_amount, invoice_date,
       tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name),
       units(unit_number)
     `)
@@ -411,7 +425,8 @@ export async function fetchAgingRows(projectId) {
     const key = `${tName}||${uNo}`;
     const age = Math.floor((today - new Date(inv.invoice_date)) / 86_400_000);
     const bal = Number(inv.balance_amount) || 0;
-    if (!map[key]) map[key] = { tenant: tName, unit: uNo, total: 0, d0: 0, d31: 0, d61: 0, d90: 0 };
+    if (!map[key]) map[key] = { tenant: tName, unit: uNo, invoices: [], total: 0, d0: 0, d31: 0, d61: 0, d90: 0 };
+    map[key].invoices.push(inv);
     map[key].total += bal;
     if (age <= 30) map[key].d0 += bal;
     else if (age <= 60) map[key].d31 += bal;
@@ -422,6 +437,7 @@ export async function fetchAgingRows(projectId) {
   return Object.values(map).map((r) => ({
     tenant: r.tenant,
     unit: r.unit,
+    invoices: r.invoices,
     total: r.total.toLocaleString("en-IN"),
     d0: r.d0 > 0 ? r.d0.toLocaleString("en-IN") : "-",
     d31: r.d31 > 0 ? r.d31.toLocaleString("en-IN") : "-",
@@ -536,4 +552,22 @@ export async function fetchUninvoicedLeases(projectId) {
   const invoicedSet = new Set((invoiced ?? []).map((r) => r.lease_id));
 
   return leases.filter((l) => !invoicedSet.has(l.id));
+}
+
+export async function fetchTenantBankDetails(partyId) {
+  const { data } = await supabase
+    .from("tenant_bank_accounts")
+    .select("*")
+    .eq("tenant_party_id", partyId)
+    .limit(1);
+  return data?.[0] || null;
+}
+
+export async function fetchOwnerBankDetails(partyId) {
+  const { data } = await supabase
+    .from("owner_bank_accounts")
+    .select("*")
+    .eq("owner_party_id", partyId)
+    .limit(1);
+  return data?.[0] || null;
 }
