@@ -21,7 +21,7 @@ function LoadingSpinner() {
   );
 }
 
-function Header({ setMobileOpen }) {
+function Header({ mobileOpen, setMobileOpen }) {
   return (
     <header style={{
       background: "#0f2d5a",
@@ -36,7 +36,7 @@ function Header({ setMobileOpen }) {
             style={{ border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff" }}
             onClick={() => setMobileOpen(true)}
           >
-            Menu
+            ☰
           </button>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "#ffffff", margin: 0 }}>Collections</h1>
@@ -155,7 +155,7 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
       <div className="flex min-h-screen">
         <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Collections" onNavigate={onNavigate} />
         <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-          <Header setMobileOpen={setMobileOpen} />
+          <Header mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
           <div className="p-4 sm:p-6 space-y-5">
             {/* KPI Cards */}

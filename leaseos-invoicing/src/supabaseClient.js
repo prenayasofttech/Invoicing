@@ -174,7 +174,7 @@ export async function fetchUnitsByProject(projectId, ownerPartyId) {
 /** All active leases with full context for a project + optional owner filter */
 export async function fetchLeasesForInvoicing(projectId, ownerPartyId) {
   const leases = await fetchLeasesByProject(projectId);
-  if (!ownerPartyId) return leases;
+  if (!ownerPartyId || ownerPartyId === "ALL") return leases;
   return leases.filter((l) => l.party_owner_id == ownerPartyId);
 }
 
@@ -192,10 +192,10 @@ export async function fetchInvoices({ projectId, billingMonth, ownerPartyId, sta
       company_id, project_id, unit_id, lease_id, owner_party_id, tenant_party_id,
       rent_amount, cam_amount, gst_amount, total_amount,
       collected_amount, balance_amount, status, notes,
-      projects(project_name),
-      units(unit_number, floor_number),
-      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name),
-      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name)
+      projects(project_name, location),
+      units(unit_number, floor_number, chargeable_area),
+      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name, address_line1, address_line2, city, state, postal_code),
+      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, address_line1, address_line2, city, state, postal_code)
     `)
     .order("invoice_date", { ascending: false });
 
@@ -219,9 +219,13 @@ function normalizeInvoice(r) {
   return {
     ...r,
     project_name: r.projects?.project_name || "—",
+    project_location: r.projects?.location || "—",
     unit_no: r.units?.unit_number || "—",
+    area_sqft: r.units?.chargeable_area || 0,
     owner_name: ownerName,
+    owner_address: [r.owner?.address_line1, r.owner?.address_line2, r.owner?.city, r.owner?.state].filter(Boolean).join(", ") || "—",
     tenant_name: tenantName,
+    tenant_address: [r.tenant?.address_line1, r.tenant?.address_line2, r.tenant?.city, r.tenant?.state].filter(Boolean).join(", ") || "—",
   };
 }
 
