@@ -3,6 +3,8 @@ import LeaseOSDashboardUI from "./LeaseOSDashboardUI";
 import LeaseOSInvoicingUI from "./LeaseOSInvoicingUI";
 import LeaseOSCollectionsUI from "./LeaseOSCollectionsUI";
 import LeaseOSRentLedgerUI from "./LeaseOSRentLedgerUI";
+import LeaseOSOwnerMasterUI from "./LeaseOSOwnerMasterUI";
+import LeaseOSTenantMasterUI from "./LeaseOSTenantMasterUI";
 
 function App() {
   const [activePage, setActivePage] = useState("Dashboard");
@@ -15,6 +17,12 @@ function App() {
   }
   if (activePage === "Rent Ledger") {
     return <LeaseOSRentLedgerUI onNavigate={setActivePage} />;
+  }
+  if (activePage === "Owner Master") {
+    return <LeaseOSOwnerMasterUI onNavigate={setActivePage} />;
+  }
+  if (activePage === "Tenant Master") {
+    return <LeaseOSTenantMasterUI onNavigate={setActivePage} />;
   }
 
   return <LeaseOSDashboardUI onNavigate={setActivePage} />;

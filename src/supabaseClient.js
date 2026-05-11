@@ -174,7 +174,7 @@ export async function fetchUnitsByProject(projectId, ownerPartyId) {
 /** All active leases with full context for a project + optional owner filter */
 export async function fetchLeasesForInvoicing(projectId, ownerPartyId) {
   const leases = await fetchLeasesByProject(projectId);
-  if (!ownerPartyId) return leases;
+  if (!ownerPartyId || ownerPartyId === "ALL") return leases;
   return leases.filter((l) => l.party_owner_id == ownerPartyId);
 }
 

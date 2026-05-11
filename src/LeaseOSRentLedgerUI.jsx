@@ -27,7 +27,7 @@ function LoadingSpinner() {
   );
 }
 
-function Header({ setMobileOpen }) {
+function Header({ mobileOpen, setMobileOpen }) {
   return (
     <header style={{
       background: "#0f2d5a",
@@ -41,7 +41,7 @@ function Header({ setMobileOpen }) {
             className="lg:hidden rounded-lg px-3 py-1.5 text-sm"
             style={{ border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff" }}
             onClick={() => setMobileOpen(true)}
-          >Menu</button>
+          >☰</button>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "#ffffff", margin: 0 }}>Rent Ledger</h1>
             <p className="text-xs" style={{ color: "rgba(255,255,255,0.65)", margin: 0 }}>Aging - Statements - Owner Reports</p>
@@ -331,7 +331,7 @@ export default function LeaseOSRentLedgerUI({ onNavigate }) {
       <div className="flex min-h-screen">
         <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Rent Ledger" onNavigate={onNavigate} />
         <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-          <Header setMobileOpen={setMobileOpen} />
+          <Header mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
           <div className="p-4 sm:p-6 space-y-5">
             <div className="inline-flex rounded-lg bg-slate-100 p-1">
               <button className={tabClass(activeTab === "Debtors Aging")} onClick={() => setActiveTab("Debtors Aging")} type="button">Debtors Aging</button>

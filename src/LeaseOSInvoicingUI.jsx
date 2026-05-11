@@ -21,7 +21,7 @@ function LoadingSpinner() {
   );
 }
 
-function TopBar({ setMobileOpen }) {
+function TopBar({ mobileOpen, setMobileOpen }) {
   return (
     <header style={{
       background: "#0f2d5a",
@@ -36,6 +36,7 @@ function TopBar({ setMobileOpen }) {
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button
           type="button"
+          className="lg:hidden"
           style={{ border: "1px solid rgba(255,255,255,0.25)", borderRadius: "6px", padding: "6px 12px", fontSize: "13px", background: "transparent", cursor: "pointer", color: "#fff" }}
           onClick={() => setMobileOpen(true)}
         >☰</button>
@@ -252,6 +253,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
             disabled={!selectedProject || loadingOwners}
           >
             <option value="">{loadingOwners ? "Loading owners..." : "Select Owner"}</option>
+            <option value="ALL">All Owners</option>
             {owners.map((o) => (
               <option key={o.id} value={o.id}>{o.display_name} {o.owner_group ? `(${o.owner_group})` : ""}</option>
             ))}
@@ -385,7 +387,9 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
                 invoice_date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
                 due_date: new Date(Date.now() + 864000000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
                 billing_month: selectedMonth,
-                owner_name: selectedOwner,
+                owner_name: selectedOwner === "ALL" 
+                  ? (owners.find(o => o.id === selected[0].party_owner_id)?.display_name || selected[0].owner?.company_name || selected[0].owner?.first_name || "—")
+                  : (owners.find(o => o.id === selectedOwner)?.display_name || "—"),
                 tenant_name: selected[0].tenant?.brand_name || selected[0].tenant?.company_name || selected[0].tenant?.first_name || "—",
                 unit_no: selected[0].units?.unit_number,
                 project_name: projects.find(p => p.id === selectedProject)?.project_name || "Commercial Project",
@@ -696,7 +700,7 @@ export default function LeaseOSInvoicingUI({ onNavigate }) {
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex" }}>
       <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Invoicing" onNavigate={onNavigate} />
       <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-        <TopBar setMobileOpen={setMobileOpen} />
+        <TopBar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
         <div style={{ padding: "20px 24px" }}>
           <InvoiceTabs activeTab={activeTab} setActiveTab={setActiveTab} />
           <div style={{ marginTop: "20px" }}>
