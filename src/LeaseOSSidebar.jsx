@@ -6,15 +6,6 @@ const menuSections = [
     items: [{ label: "Dashboard" }],
   },
   {
-    title: "LEASING",
-    items: [
-      { label: "Unit Inventory" },
-      { label: "Active Leases" },
-      { label: "Create Lease" },
-      { label: "Escalations", badge: 3 },
-    ],
-  },
-  {
     title: "BILLING & COLLECTION",
     items: [
       { label: "Invoicing", badge: 5 },
@@ -41,7 +32,7 @@ export default function LeaseOSSidebar({ mobileOpen, setMobileOpen, currentPage,
         className={`fixed top-0 left-0 z-40 h-screen w-72 shrink-0 bg-white text-slate-900 transform transition-transform duration-200 flex flex-col overflow-y-auto border-r border-slate-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="px-5 py-6 sticky top-0 bg-white z-10 border-b border-slate-100 min-h-[85px] flex flex-col justify-center">
-          <p className="text-xl font-bold tracking-tight text-slate-900">LeaseOS</p>
+          <p className="text-xl font-bold tracking-tight text-slate-900">{localStorage.getItem("dmaic_company_name") || "LeaseOS"}</p>
           <p className="text-xs text-slate-500 mt-1">Invoicing &amp; Collections</p>
         </div>
 
