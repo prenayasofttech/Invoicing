@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import LeaseOSSidebar from "./LeaseOSSidebar";
-import { fetchActiveTenantParties, fetchOutstandingByTenant, fetchRecentCollections, createCollection } from "./supabaseClient";
+import { fetchActiveTenantParties, fetchOutstandingByTenant, fetchRecentCollections } from "./supabaseClient";
+import CollectionReceiptPopup from "./CollectionReceiptPopup";
 
 function EmptyState({ message }) {
   return (
@@ -21,7 +22,7 @@ function LoadingSpinner() {
   );
 }
 
-function Header({ setMobileOpen }) {
+function Header({ mobileOpen, setMobileOpen }) {
   return (
     <header style={{
       background: "#0f2d5a",
@@ -36,7 +37,7 @@ function Header({ setMobileOpen }) {
             style={{ border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff" }}
             onClick={() => setMobileOpen(true)}
           >
-            Menu
+            ☰
           </button>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "#ffffff", margin: 0 }}>Collections</h1>
@@ -60,8 +61,17 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
   const [loadingTenants, setLoadingTenants] = useState(true);
   const [loadingOutstanding, setLoadingOutstanding] = useState(false);
   const [loadingCollections, setLoadingCollections] = useState(true);
-  const [settling, setSettling] = useState(false);
+  const [showSettlePopup, setShowSettlePopup] = useState(false);
   const [checkedInvoices, setCheckedInvoices] = useState({});
+  const [receiptToPrint, setReceiptToPrint] = useState(null);
+
+  const handlePrintReceipt = (row) => {
+    setReceiptToPrint(row);
+    setTimeout(() => {
+      window.print();
+      setReceiptToPrint(null);
+    }, 100);
+  };
 
   // Load tenants + recent collections on mount
   const loadRecent = () => {
@@ -82,7 +92,6 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
   }, []);
 
   const loadOutstanding = () => {
-    if (!selectedTenant) { setOutstandingRows([]); return; }
     setLoadingOutstanding(true);
     fetchOutstandingByTenant(selectedTenant)
       .then((rows) => {
@@ -106,9 +115,11 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
     ? Math.max(...outstandingRows.map((r) => Math.floor((Date.now() - new Date(r.invoice_date)) / 86400000)))
     : null;
 
+  const selectedTenantName = tenants.find(t => t.id === selectedTenant)?.display_name || (selectedTenant ? "Loading..." : "All Tenants");
+
   const summaryCards = [
-    { label: "Selected Tenant", value: selectedTenant || "None", accent: "text-slate-900 text-base truncate" },
-    { label: "Outstanding Invoices", value: outstandingRows.length || "—", accent: "text-rose-600" },
+    { label: "Selected Tenant", value: selectedTenantName, accent: "text-slate-900 text-base truncate" },
+    { label: "Outstanding Invoices", value: outstandingRows.length || "0", accent: "text-rose-600" },
     { label: "Total Dues", value: totalDues > 0 ? `₹${totalDues.toLocaleString("en-IN")}` : "—", accent: "text-rose-700" },
     { label: "Oldest Invoice", value: oldestDate ? `${oldestDate}d` : "—", accent: "text-amber-700" },
   ];
@@ -116,54 +127,38 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
   const selectedInvoices = outstandingRows.filter((r) => checkedInvoices[r.id]);
   const selectedAmount = selectedInvoices.reduce((s, r) => s + (Number(r.balance_amount) || 0), 0);
 
-  async function handleSettle() {
+  // Open settlement popup
+  function openSettlePopup() {
     if (selectedInvoices.length === 0) return;
-    setSettling(true);
-    try {
-      for (const inv of selectedInvoices) {
-        const amt = Number(inv.balance_amount) || 0;
-        await createCollection({
-          receipt_no: `REC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          company_id: inv.company_id, // ensure company isolation
-          invoice_id: inv.id,
-          project_id: inv.project_id,
-          unit_id: inv.unit_id,
-          tenant_party_id: selectedTenant,
-          receipt_date: new Date().toISOString().split("T")[0],
-          payment_mode: "NEFT",
-          reference_no: `TRX-${Math.floor(Math.random() * 1000000)}`,
-          amount: amt,
-          net_amount: amt,
-        });
-      }
-      alert(`Successfully settled ${selectedInvoices.length} invoice(s)!`);
-      loadOutstanding();
-      loadRecent();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to settle invoices. Check console.");
-    } finally {
-      setSettling(false);
-    }
+    setShowSettlePopup(true);
   }
+
+  function handleSettled() {
+    setShowSettlePopup(false);
+    setCheckedInvoices({});
+    loadOutstanding();
+    loadRecent();
+  }
+
+
 
   // Calculate age in days
   const ageInDays = (dateStr) => Math.floor((Date.now() - new Date(dateStr)) / 86400000);
 
   return (
-    <div className="min-h-screen text-slate-900" style={{ background: "var(--page-bg)" }}>
-      <div className="flex min-h-screen">
+    <div className="min-h-screen text-slate-900 bg-slate-50 relative">
+      <div className={`flex min-h-screen ${receiptToPrint ? "print:hidden" : ""}`}>
         <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Collections" onNavigate={onNavigate} />
         <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-          <Header setMobileOpen={setMobileOpen} />
+          <Header mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
           <div className="p-4 sm:p-6 space-y-5">
             {/* KPI Cards */}
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {summaryCards.map((card) => (
-                <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">{card.label}</p>
-                  <p className={`mt-2 text-3xl font-semibold ${card.accent}`}>{card.value}</p>
+                <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 overflow-hidden">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 truncate">{card.label}</p>
+                  <p className={`mt-2 text-3xl font-semibold truncate ${card.accent}`} title={card.value}>{card.value}</p>
                 </article>
               ))}
             </section>
@@ -182,20 +177,29 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                     onChange={(e) => setSelectedTenant(e.target.value)}
                     disabled={loadingTenants}
                   >
-                    <option value="">{loadingTenants ? "Loading..." : "Select Tenant..."}</option>
+                    <option value="">{loadingTenants ? "Loading..." : "All Tenants"}</option>
                     {tenants.map((t, i) => (
                       <option key={i} value={t.id}>{t.display_name} ({t.unit_no})</option>
                     ))}
                   </select>
-                  <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Auto Adjust</button>
+                  <button
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    onClick={() => {
+                      if (outstandingRows.length === 0) return;
+                      const allChecked = {};
+                      outstandingRows.forEach(r => allChecked[r.id] = true);
+                      setCheckedInvoices(allChecked);
+                      setTimeout(() => setShowSettlePopup(true), 50);
+                    }}
+                  >
+                    Auto Adjust
+                  </button>
                 </div>
               </div>
 
               <div className="px-4 sm:px-5 py-4">
-                {loadingOutstanding ? <LoadingSpinner /> : !selectedTenant ? (
-                  <EmptyState message="Select a tenant above to view outstanding invoices" />
-                ) : outstandingRows.length === 0 ? (
-                  <EmptyState message="No outstanding invoices for this tenant 🎉" />
+                {loadingOutstanding ? <LoadingSpinner /> : outstandingRows.length === 0 ? (
+                  <EmptyState message={selectedTenant ? "No outstanding invoices for this tenant 🎉" : "No outstanding invoices found across any tenants 🎉"} />
                 ) : (
                   <>
                     <div className="overflow-auto">
@@ -203,6 +207,7 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                         <thead className="bg-slate-950 text-white text-xs uppercase tracking-wide">
                           <tr className="text-left">
                             <th className="p-3"> </th>
+                            <th className="p-3">Tenant</th>
                             <th className="p-3">Invoice No</th><th className="p-3">Date</th>
                             <th className="p-3">Period</th><th className="p-3">Invoice Amt</th>
                             <th className="p-3">Already Paid</th><th className="p-3">Balance Due</th>
@@ -220,6 +225,7 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                                   className="h-4 w-4 rounded border-slate-300"
                                 />
                               </td>
+                              <td className="p-3 font-semibold text-slate-700">{row.tenant_name || "—"}</td>
                               <td className="p-3 font-medium">{row.invoice_no}</td>
                               <td className="p-3">{row.invoice_date}</td>
                               <td className="p-3">{row.billing_month}</td>
@@ -258,10 +264,10 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                         >Select All Outstanding</button>
                         <button
                           className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
-                          disabled={settling || selectedInvoices.length === 0}
-                          onClick={handleSettle}
+                          disabled={selectedInvoices.length === 0}
+                          onClick={openSettlePopup}
                         >
-                          {settling ? "Settling..." : "Settle Selected →"}
+                          Open Settlement →
                         </button>
                       </div>
                     </div>
@@ -288,6 +294,7 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                         <th className="py-2">Invoice Ref</th><th className="py-2">Mode</th>
                         <th className="py-2">Ref No</th><th className="py-2">Amount</th>
                         <th className="py-2">TDS</th><th className="py-2">Net</th>
+                        <th className="py-2">Status</th><th className="py-2 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -302,7 +309,14 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                           <td className="py-2.5">{row.reference_no}</td>
                           <td className="py-2.5">₹{Number(row.amount).toLocaleString("en-IN")}</td>
                           <td className="py-2.5">{row.tds_amount ? `₹${Number(row.tds_amount).toLocaleString("en-IN")}` : "—"}</td>
-                          <td className="py-2.5 text-emerald-700">₹{Number(row.net_amount).toLocaleString("en-IN")}</td>
+                          <td className="py-2.5 text-emerald-700 font-semibold">₹{Number(row.net_amount).toLocaleString("en-IN")}</td>
+                          <td className="py-2.5"><span className="rounded bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Settled</span></td>
+                          <td className="py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button className="text-xs font-semibold text-blue-600 hover:text-blue-800" onClick={() => handlePrintReceipt(row)}>Print</button>
+                              <button className="text-xs font-semibold text-slate-600 hover:text-slate-800" onClick={() => handlePrintReceipt(row)}>PDF</button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -313,6 +327,89 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
           </div>
         </main>
       </div>
+
+      {/* Settlement Popup */}
+      <CollectionReceiptPopup
+        isOpen={showSettlePopup}
+        onClose={() => setShowSettlePopup(false)}
+        selectedInvoices={selectedInvoices}
+        onSettled={handleSettled}
+      />
+
+      {/* Hidden Print Receipt Template */}
+      {receiptToPrint && (
+        <div className="hidden print:block fixed inset-0 bg-white z-[99999] p-12 print:p-0">
+          <div className="max-w-4xl mx-auto border border-slate-200 p-12">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-slate-300 pb-8 mb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">PAYMENT RECEIPT</h1>
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Receipt #{receiptToPrint.receipt_no}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-slate-900 text-lg">{localStorage.getItem("dmaic_company_name") || "LeaseOS ERP"}</p>
+                <p className="text-sm text-slate-600 mt-1">Date: {receiptToPrint.receipt_date}</p>
+                <div className="mt-2 inline-block bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded">
+                  Settled
+                </div>
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-12 mb-12">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Received From</p>
+                <p className="font-bold text-slate-900 text-lg">{receiptToPrint.tenant_name || "Tenant"}</p>
+                <p className="text-sm text-slate-600 mt-1">Unit Reference: {receiptToPrint.unit_no || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Payment Info</p>
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr><td className="py-1 text-slate-600">Payment Mode</td><td className="py-1 font-semibold text-right">{receiptToPrint.payment_mode}</td></tr>
+                    <tr><td className="py-1 text-slate-600">Reference No</td><td className="py-1 font-semibold text-right">{receiptToPrint.reference_no}</td></tr>
+                    <tr><td className="py-1 text-slate-600">Invoice Ref</td><td className="py-1 font-semibold text-right">{receiptToPrint.invoice_ref}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Amounts Table */}
+            <table className="w-full text-left border-collapse mb-12">
+              <thead>
+                <tr className="border-b-2 border-slate-900">
+                  <th className="py-3 font-bold text-sm uppercase tracking-wider">Description</th>
+                  <th className="py-3 font-bold text-sm uppercase tracking-wider text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="border-b border-slate-300">
+                <tr>
+                  <td className="py-4 text-slate-800">Gross Payment Received</td>
+                  <td className="py-4 font-medium text-right text-slate-900">₹{Number(receiptToPrint.amount).toLocaleString("en-IN")}</td>
+                </tr>
+                {receiptToPrint.tds_amount && Number(receiptToPrint.tds_amount) > 0 && (
+                  <tr>
+                    <td className="py-4 text-slate-800">Less: TDS Deducted</td>
+                    <td className="py-4 font-medium text-right text-rose-600">- ₹{Number(receiptToPrint.tds_amount).toLocaleString("en-IN")}</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-50">
+                  <td className="py-4 px-3 font-bold text-lg text-slate-900">Net Settled Amount</td>
+                  <td className="py-4 px-3 font-bold text-xl text-emerald-700 text-right">₹{Number(receiptToPrint.net_amount).toLocaleString("en-IN")}</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Footer */}
+            <div className="mt-20 border-t border-slate-300 pt-8 text-center">
+              <p className="text-xs text-slate-500 font-medium">This is a system generated receipt and does not require a physical signature.</p>
+              <p className="text-[10px] text-slate-400 mt-1">Generated by LeaseOS Financial ERP</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,135 +7,174 @@ import {
   fetchOwnerReport,
   fetchActiveTenantParties,
 } from "./supabaseClient";
+import CollectionReceiptPopup from "./CollectionReceiptPopup";
 
-function EmptyState({ message }) {
+function EmptyState({ message, icon = "📭" }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-slate-400 text-sm">
-      <span className="text-3xl mb-2">📭</span>
-      {message}
+    <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-sm">
+      <span className="text-5xl mb-4">{icon}</span>
+      <p className="text-lg font-medium text-slate-500">{message}</p>
     </div>
   );
 }
 
 function LoadingSpinner() {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-slate-500 text-sm">
-      <div style={{ width: "28px", height: "28px", border: "3px solid #e5e7eb", borderTop: "3px solid #0f2d5a", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "8px" }} />
-      Loading...
+    <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-sm">
+      <div style={{ width: "32px", height: "32px", border: "3px solid #e5e7eb", borderTop: "3px solid #0f2d5a", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "12px" }} />
+      Loading data...
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-function Header({ setMobileOpen }) {
+function TopBar({ mobileOpen, setMobileOpen }) {
   return (
-    <header style={{
-      background: "#0f2d5a",
-      borderBottom: "1px solid #1a3d70",
-      padding: "16px 24px",
-    }}>
-      <div className="flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="lg:hidden rounded-lg px-3 py-1.5 text-sm"
-            style={{ border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff" }}
-            onClick={() => setMobileOpen(true)}
-          >Menu</button>
-          <div>
-            <h1 className="text-xl font-semibold" style={{ color: "#ffffff", margin: 0 }}>Rent Ledger</h1>
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.65)", margin: 0 }}>Aging - Statements - Owner Reports</p>
-          </div>
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 shadow-sm no-print">
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          className="lg:hidden rounded bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+          onClick={() => setMobileOpen(true)}
+        >☰</button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: "Georgia, serif" }}>Rent Ledger</h1>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span style={{ borderRadius: "20px", background: "rgba(239,68,68,0.18)", padding: "4px 12px", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.35)" }}>Live Data</span>
-        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Live Sync
+        </span>
       </div>
     </header>
   );
 }
 
-function tabClass(active) {
-  return active
-    ? "rounded-md border border-blue-700 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm"
-    : "rounded-md border border-transparent bg-transparent px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700";
-}
+// ─── DEBTORS AGING VIEW ────────────────────────────────────────────────────────
+function DebtorsAgingView({ loadData, agingSummary, rows, loadingSummary, loadingRows, onSettle }) {
+  const [filterTenant, setFilterTenant] = useState("");
 
-// ─── Aging View ───────────────────────────────────────────────────────────────
-function AgingView() {
-  const [summary, setSummary] = useState([]);
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchAgingSummary(), fetchAgingRows()])
-      .then(([s, r]) => { setSummary(s); setRows(r); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const toneCard = (tone) => {
-    if (tone === "teal") return "border-teal-400 text-teal-800";
-    if (tone === "amber") return "border-amber-400 text-amber-800";
-    if (tone === "orange") return "border-orange-400 text-orange-800";
-    return "border-rose-400 text-rose-800";
-  };
+  const filteredRows = rows.filter(r =>
+    !filterTenant || r.tenant.toLowerCase().includes(filterTenant.toLowerCase())
+  );
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {loading ? (
-          <div className="col-span-4 rounded-xl border border-slate-200 bg-white p-6"><LoadingSpinner /></div>
-        ) : summary.length === 0 ? (
-          <div className="col-span-4 rounded-xl border border-slate-200 bg-white p-6"><EmptyState message="No aging data available" /></div>
-        ) : (
-          summary.map((card) => (
-            <article key={card.label} className={`rounded-xl border-2 bg-white p-4 ${toneCard(card.tone)}`}>
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">{card.label}</p>
-              <p className="mt-1 text-4xl font-semibold text-slate-900">{card.value}</p>
-              <p className="mt-1 text-xs text-slate-500">{card.meta}</p>
-            </article>
-          ))
-        )}
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 sm:px-5 py-4 flex items-center justify-between">
-          <p className="text-sm font-semibold">Debtors Aging — Detailed Report</p>
-          <button className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium">Export Excel</button>
+    <div className="space-y-6">
+      {/* Alert Ribbon */}
+      {rows.length > 0 && rows.some(r => r.d90 !== "-") && (
+        <div className="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-md flex items-start">
+          <span className="text-rose-500 mr-3 text-lg">⚠️</span>
+          <div>
+            <h3 className="text-sm font-semibold text-rose-800">Critical Outstanding Alert</h3>
+            <p className="text-xs text-rose-600 mt-1">Some tenants have invoices overdue by more than 90 days. Immediate action required.</p>
+          </div>
         </div>
-        <div className="px-4 sm:px-5 py-4 overflow-auto">
-          {loading ? <LoadingSpinner /> : rows.length === 0 ? (
-            <EmptyState message="No outstanding debtors 🎉" />
+      )}
+
+      {/* Top Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loadingSummary ? (
+          Array(4).fill(0).map((_, i) => <div key={i} className="h-28 bg-slate-100 rounded-xl animate-pulse" />)
+        ) : (
+          agingSummary.map((kpi, i) => {
+            let colors = { bg: "bg-white", border: "border-slate-200", text: "text-slate-800", label: "text-slate-500" };
+            if (kpi.tone === "teal") colors = { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-900", label: "text-teal-700" };
+            if (kpi.tone === "amber") colors = { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-900", label: "text-amber-700" };
+            if (kpi.tone === "orange") colors = { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-900", label: "text-orange-700" };
+            if (kpi.tone === "rose") colors = { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-900", label: "text-rose-700" };
+
+            return (
+              <div key={i} className={`rounded-xl border p-5 shadow-sm overflow-hidden ${colors.bg} ${colors.border}`}>
+                <p className={`text-xs font-bold tracking-wider uppercase mb-2 truncate ${colors.label}`}>{kpi.label}</p>
+                <p className={`text-3xl font-extrabold truncate ${colors.text}`} title={kpi.value}>{kpi.value}</p>
+                <div className="mt-3 flex items-center justify-between text-xs font-medium opacity-80">
+                  <span className={colors.text}>{kpi.meta}</span>
+                  {kpi.tone === "rose" && <span className="bg-rose-600 text-white px-2 py-0.5 rounded text-[10px]">High Risk</span>}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Filters & Export */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex gap-3 flex-1 min-w-[300px]">
+          <input
+            type="text"
+            placeholder="Search tenant name..."
+            className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={filterTenant}
+            onChange={(e) => setFilterTenant(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Export Excel</button>
+          <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800" onClick={() => window.print()}>Print Report</button>
+        </div>
+      </div>
+
+      {/* Detailed Aging Table */}
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+          <h2 className="text-base font-bold text-slate-800">Detailed Aging Report</h2>
+        </div>
+        <div className="overflow-x-auto">
+          {loadingRows ? <LoadingSpinner /> : filteredRows.length === 0 ? (
+            <EmptyState message="No outstanding debtors " icon="" />
           ) : (
-            <table className="w-full min-w-[1100px] text-sm">
-              <thead className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
+            <table className="w-full min-w-[1200px] text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr className="text-left">
-                  <th className="py-2">Tenant</th><th className="py-2">Unit</th>
-                  <th className="py-2">Total Outstanding</th><th className="py-2">0-30 Days</th>
-                  <th className="py-2">31-60 Days</th><th className="py-2">61-90 Days</th>
-                  <th className="py-2">&gt; 90 Days</th><th className="py-2">Aging Bar</th><th className="py-2">Action</th>
+                  <th className="px-6 py-4">Tenant & Unit</th>
+                  <th className="px-6 py-4 text-right">Total Outstanding</th>
+                  <th className="px-6 py-4 text-right">0–30 Days</th>
+                  <th className="px-6 py-4 text-right">31–60 Days</th>
+                  <th className="px-6 py-4 text-right">61–90 Days</th>
+                  <th className="px-6 py-4 text-right">&gt; 90 Days</th>
+                  <th className="px-6 py-4">Status & Action</th>
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.tenant + row.unit} className="border-b border-slate-100">
-                    <td className="py-2.5 font-medium">{row.tenant}</td>
-                    <td className="py-2.5">{row.unit}</td>
-                    <td className="py-2.5 font-semibold">₹{row.total}</td>
-                    <td className="py-2.5 text-emerald-700">{row.d0 === "-" ? "-" : `₹${row.d0}`}</td>
-                    <td className="py-2.5 text-amber-700">{row.d31 === "-" ? "-" : `₹${row.d31}`}</td>
-                    <td className="py-2.5">{row.d61 === "-" ? "-" : `₹${row.d61}`}</td>
-                    <td className="py-2.5 text-rose-700">{row.d90 === "-" ? "-" : `₹${row.d90}`}</td>
-                    <td className="py-2.5">
-                      <div className={`h-3 w-32 rounded-full ${row.bar === "rose" ? "bg-rose-600" : row.bar === "orange" ? "bg-orange-500" : row.bar === "amber" ? "bg-amber-500" : "bg-teal-600"}`} />
-                    </td>
-                    <td className="py-2.5">
-                      <button className="rounded-full bg-teal-600 px-3 py-1 text-xs font-semibold text-white">Settle</button>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-100">
+                {filteredRows.map((row, idx) => {
+                  const hasCritical = row.d90 !== "-";
+                  const hasWarning = row.d61 !== "-";
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900">{row.tenant}</p>
+                        <p className="text-xs text-slate-500">Unit: {row.unit}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-900">₹{row.total}</td>
+                      <td className="px-6 py-4 text-right font-medium text-emerald-600">{row.d0 === "-" ? "-" : `₹${row.d0}`}</td>
+                      <td className="px-6 py-4 text-right font-medium text-amber-600">{row.d31 === "-" ? "-" : `₹${row.d31}`}</td>
+                      <td className="px-6 py-4 text-right font-medium text-orange-600">{row.d61 === "-" ? "-" : `₹${row.d61}`}</td>
+                      <td className="px-6 py-4 text-right font-bold text-rose-600">{row.d90 === "-" ? "-" : `₹${row.d90}`}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-col gap-1 w-24">
+                            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                              {row.d0 !== "-" && <div className="bg-emerald-500 h-full" style={{ width: '25%' }} />}
+                              {row.d31 !== "-" && <div className="bg-amber-500 h-full" style={{ width: '25%' }} />}
+                              {row.d61 !== "-" && <div className="bg-orange-500 h-full" style={{ width: '25%' }} />}
+                              {row.d90 !== "-" && <div className="bg-rose-500 h-full" style={{ width: '25%' }} />}
+                            </div>
+                            <span className="text-[10px] font-semibold text-slate-400">
+                              {hasCritical ? "CRITICAL" : hasWarning ? "WARNING" : "NORMAL"}
+                            </span>
+                          </div>
+                          <button
+                            className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+                            onClick={() => onSettle(row.invoices)}
+                          >
+                            Settle
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -145,24 +184,15 @@ function AgingView() {
   );
 }
 
-// ─── Tenant Statement View ────────────────────────────────────────────────────
-function TenantStatementView() {
-  const [tenants, setTenants] = useState([]);
+// ─── TENANT STATEMENT VIEW ──────────────────────────────────────────────────
+function TenantStatementView({ tenants, loadingTenants }) {
   const [selectedKey, setSelectedKey] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [loadingTenants, setLoadingTenants] = useState(true);
-
-  useEffect(() => {
-    fetchActiveTenantParties()
-      .then(setTenants)
-      .catch(console.error)
-      .finally(() => setLoadingTenants(false));
-  }, []);
 
   useEffect(() => {
     if (!selectedKey) { setRows([]); return; }
-    const [tenantPartyId, unitNo] = selectedKey.split("||");
+    const [tenantPartyId, _] = selectedKey.split("||");
     setLoading(true);
     fetchTenantStatement(tenantPartyId)
       .then(setRows)
@@ -170,181 +200,292 @@ function TenantStatementView() {
       .finally(() => setLoading(false));
   }, [selectedKey]);
 
-  // Compute running balance from rows
   let runningBalance = 0;
+  let totalDebit = 0;
+  let totalCredit = 0;
+
   const processedRows = rows.map((inv) => {
-    runningBalance += Number(inv.total_amount) || 0;
-    runningBalance -= Number(inv.collected_amount) || 0;
+    const d = Number(inv.total_amount) || 0;
+    const c = Number(inv.collected_amount) || 0;
+    runningBalance += d;
+    runningBalance -= c;
+    totalDebit += d;
+    totalCredit += c;
     return {
-      date: inv.invoice_date,
-      particulars: `Rent Invoice - ${inv.billing_month}`,
-      invoice: inv.invoice_no,
-      debit: `₹${Number(inv.total_amount).toLocaleString("en-IN")}`,
-      credit: inv.collected_amount > 0 ? `₹${Number(inv.collected_amount).toLocaleString("en-IN")}` : "—",
+      date: new Date(inv.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      particulars: `Invoice ${inv.invoice_no}`,
+      debit: d > 0 ? `₹${d.toLocaleString("en-IN")}` : "—",
+      credit: c > 0 ? `₹${c.toLocaleString("en-IN")}` : "—",
       balance: `₹${runningBalance.toLocaleString("en-IN")}`,
-      remarks: inv.lease_type || "—",
+      remarks: c > 0 && c >= d ? "Settled" : c > 0 ? "Partial" : "Unpaid"
     };
   });
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">Tenant Ledger Statement</p>
-        <div className="flex gap-2">
-          <select
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            value={selectedKey}
-            onChange={(e) => setSelectedKey(e.target.value)}
-            disabled={loadingTenants}
-          >
-            <option value="">{loadingTenants ? "Loading..." : "Select Tenant - Unit..."}</option>
-            {tenants.map((t, i) => (
-              <option key={i} value={`${t.id}||${t.unit_no}`}>{t.display_name} — {t.unit_no}</option>
-            ))}
-          </select>
-          <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm">PDF</button>
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-900 mb-4">Account Statement Generation</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[250px]">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Select Tenant</label>
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
+              disabled={loadingTenants}
+            >
+              <option value="">{loadingTenants ? "Loading tenants..." : "Search & Select Tenant..."}</option>
+              {tenants.map((t, i) => (
+                <option key={i} value={`${t.id}||${t.unit_no}`}>{t.display_name} — Unit {t.unit_no}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Date Range</label>
+            <select className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-40">
+              <option>All Time</option>
+              <option>This Financial Year</option>
+              <option>Last 6 Months</option>
+            </select>
+          </div>
+          <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800" onClick={() => window.print()}>
+            Download PDF
+          </button>
         </div>
       </div>
-      <div className="px-4 sm:px-5 py-4 overflow-auto">
-        {loading ? <LoadingSpinner /> : !selectedKey ? (
-          <EmptyState message="Select a tenant above to view their ledger statement" />
-        ) : processedRows.length === 0 ? (
-          <EmptyState message="No ledger entries found for this tenant" />
-        ) : (
-          <table className="w-full min-w-[1050px] text-sm">
-            <thead className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-              <tr className="text-left">
-                <th className="py-2">Date</th><th className="py-2">Particulars</th>
-                <th className="py-2">Invoice No</th><th className="py-2">Debit</th>
-                <th className="py-2">Credit</th><th className="py-2">Balance</th><th className="py-2">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {processedRows.map((row, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
-                  <td className="py-2.5">{row.date}</td>
-                  <td className="py-2.5">{row.particulars}</td>
-                  <td className="py-2.5">{row.invoice}</td>
-                  <td className="py-2.5">{row.debit}</td>
-                  <td className="py-2.5 text-emerald-700">{row.credit}</td>
-                  <td className={`py-2.5 font-medium ${runningBalance > 0 ? "text-rose-700" : "text-emerald-700"}`}>{row.balance}</td>
-                  <td className="py-2.5">{row.remarks}</td>
+
+      {selectedKey && !loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Debit (Invoiced)</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">₹{totalDebit.toLocaleString("en-IN")}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Credit (Received)</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-600">₹{totalCredit.toLocaleString("en-IN")}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Closing Balance</p>
+            <p className={`mt-1 text-2xl font-bold ${runningBalance > 0 ? "text-rose-600" : "text-slate-900"}`}>₹{runningBalance.toLocaleString("en-IN")}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden print-container">
+        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800">Ledger Entries</h3>
+          {selectedKey && <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">Opening Balance: ₹0</span>}
+        </div>
+        <div className="overflow-x-auto">
+          {loading ? <LoadingSpinner /> : !selectedKey ? (
+            <EmptyState message="Select a tenant to generate their financial statement." icon="📋" />
+          ) : processedRows.length === 0 ? (
+            <EmptyState message="No transactions recorded for this tenant." icon="📝" />
+          ) : (
+            <table className="w-full min-w-[1000px] text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <tr className="text-left">
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Particulars</th>
+                  <th className="px-6 py-4 text-right">Debit (₹)</th>
+                  <th className="px-6 py-4 text-right">Credit (₹)</th>
+                  <th className="px-6 py-4 text-right">Balance (₹)</th>
+                  <th className="px-6 py-4">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {processedRows.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">{row.date}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{row.particulars}</td>
+                    <td className="px-6 py-4 text-right text-slate-900">{row.debit}</td>
+                    <td className="px-6 py-4 text-right text-emerald-600">{row.credit}</td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-900">{row.balance}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${row.remarks === 'Settled' ? 'bg-emerald-100 text-emerald-800' : row.remarks === 'Partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                        {row.remarks}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-// ─── Owner Report View ────────────────────────────────────────────────────────
+// ─── OWNER REPORT VIEW ────────────────────────────────────────────────────
 function OwnerReportView() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState("");
-
-  const monthOptions = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(); d.setMonth(d.getMonth() - i);
-    return { value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: d.toLocaleString("en-IN", { month: "long", year: "numeric" }) };
-  });
 
   useEffect(() => {
-    setLoading(true);
-    fetchOwnerReport(selectedMonth || undefined)
+    fetchOwnerReport()
       .then(setRows)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [selectedMonth]);
-
-  const totals = rows.reduce((acc, r) => {
-    acc.invoiced += Number(r.invoiced.replace(/,/g, "")) || 0;
-    acc.collected += Number(r.collected.replace(/,/g, "")) || 0;
-    acc.outstanding += Number(r.outstanding.replace(/,/g, "")) || 0;
-    return acc;
-  }, { invoiced: 0, collected: 0, outstanding: 0 });
+  }, []);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 sm:px-5 py-4 flex items-center justify-between">
-        <p className="text-sm font-semibold">Owner-wise Collection &amp; Distribution Report</p>
-        <select
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-        >
-          <option value="">All Periods</option>
-          {monthOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Owner Financial Performance</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Track invoicing vs collection efficiency per property owner.</p>
+        </div>
+        <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" onClick={() => window.print()}>Export Report</button>
       </div>
-      <div className="px-4 sm:px-5 py-4 overflow-auto">
-        {loading ? <LoadingSpinner /> : rows.length === 0 ? (
-          <EmptyState message="No owner report data available for selected period" />
-        ) : (
-          <table className="w-full min-w-[1000px] text-sm">
-            <thead className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-              <tr className="text-left">
-                <th className="py-2">Owner</th><th className="py-2">Category</th>
-                <th className="py-2">Units</th><th className="py-2">Total Invoiced</th>
-                <th className="py-2">Collected</th><th className="py-2">Outstanding</th><th className="py-2">Efficiency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.owner} className="border-b border-slate-100">
-                  <td className="py-2.5 font-medium">{row.owner}</td>
-                  <td className="py-2.5"><span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{row.category}</span></td>
-                  <td className="py-2.5">{row.units}</td>
-                  <td className="py-2.5">₹{row.invoiced}</td>
-                  <td className="py-2.5 text-emerald-700">₹{row.collected}</td>
-                  <td className="py-2.5 text-rose-700">₹{row.outstanding}</td>
-                  <td className="py-2.5"><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{row.efficiency}</span></td>
+
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          {loading ? <LoadingSpinner /> : rows.length === 0 ? (
+            <EmptyState message="No owner data available." icon="🏢" />
+          ) : (
+            <table className="w-full min-w-[1000px] text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <tr className="text-left">
+                  <th className="px-6 py-4">Owner Name</th>
+                  <th className="px-6 py-4 text-center">Units</th>
+                  <th className="px-6 py-4 text-right">Total Invoiced</th>
+                  <th className="px-6 py-4 text-right">Total Collected</th>
+                  <th className="px-6 py-4 text-right">Outstanding</th>
+                  <th className="px-6 py-4">Collection Efficiency</th>
                 </tr>
-              ))}
-              <tr className="font-semibold border-t-2 border-slate-300">
-                <td className="py-2.5">TOTAL</td><td /><td />
-                <td className="py-2.5">₹{totals.invoiced.toLocaleString("en-IN")}</td>
-                <td className="py-2.5 text-emerald-700">₹{totals.collected.toLocaleString("en-IN")}</td>
-                <td className="py-2.5 text-rose-700">₹{totals.outstanding.toLocaleString("en-IN")}</td>
-                <td className="py-2.5">
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                    {totals.invoiced > 0 ? `${((totals.collected / totals.invoiced) * 100).toFixed(1)}%` : "—"}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row, idx) => {
+                  const eff = Number(row.efficiency);
+                  const displayEff = isNaN(eff) ? 0 : eff;
+                  const effColor = displayEff >= 90 ? "bg-emerald-500" : displayEff >= 75 ? "bg-amber-500" : "bg-rose-500";
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-slate-900">{row.owner}</td>
+                      <td className="px-6 py-4 text-center text-slate-600">{row.units}</td>
+                      <td className="px-6 py-4 text-right font-medium text-slate-900">₹{row.invoiced}</td>
+                      <td className="px-6 py-4 text-right font-medium text-emerald-600">₹{row.collected}</td>
+                      <td className="px-6 py-4 text-right font-bold text-rose-600">₹{row.outstanding}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold w-9">{displayEff}%</span>
+                          <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                            <div className={`h-full ${effColor} transition-all duration-500`} style={{ width: `${displayEff}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ─── MAIN EXPORT ────────────────────────────────────────────────────────────
 export default function LeaseOSRentLedgerUI({ onNavigate }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Debtors Aging");
 
-  return (
-    <div className="min-h-screen text-slate-900" style={{ background: "var(--page-bg)" }}>
-      <div className="flex min-h-screen">
-        <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Rent Ledger" onNavigate={onNavigate} />
-        <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-          <Header setMobileOpen={setMobileOpen} />
-          <div className="p-4 sm:p-6 space-y-5">
-            <div className="inline-flex rounded-lg bg-slate-100 p-1">
-              <button className={tabClass(activeTab === "Debtors Aging")} onClick={() => setActiveTab("Debtors Aging")} type="button">Debtors Aging</button>
-              <button className={tabClass(activeTab === "Tenant Statement")} onClick={() => setActiveTab("Tenant Statement")} type="button">Tenant Statement</button>
-              <button className={tabClass(activeTab === "Owner Report")} onClick={() => setActiveTab("Owner Report")} type="button">Owner Report</button>
-            </div>
+  // Data states
+  const [agingSummary, setAgingSummary] = useState([]);
+  const [agingRows, setAgingRows] = useState([]);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingRows, setLoadingRows] = useState(true);
 
-            {activeTab === "Debtors Aging" && <AgingView />}
-            {activeTab === "Tenant Statement" && <TenantStatementView />}
-            {activeTab === "Owner Report" && <OwnerReportView />}
+  // Tenants for statement
+  const [tenants, setTenants] = useState([]);
+  const [loadingTenants, setLoadingTenants] = useState(true);
+
+  // Settlement popup state
+  const [showPopup, setShowPopup] = useState(false);
+  const [selectedInvoices, setSelectedInvoices] = useState([]);
+
+  const loadAging = () => {
+    setLoadingSummary(true);
+    setLoadingRows(true);
+    fetchAgingSummary()
+      .then(setAgingSummary)
+      .catch(console.error)
+      .finally(() => setLoadingSummary(false));
+    fetchAgingRows()
+      .then(setAgingRows)
+      .catch(console.error)
+      .finally(() => setLoadingRows(false));
+  };
+
+  useEffect(() => {
+    loadAging();
+    fetchActiveTenantParties()
+      .then(setTenants)
+      .catch(console.error)
+      .finally(() => setLoadingTenants(false));
+  }, []);
+
+  return (
+    <div className="flex min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+      <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Rent Ledger" onNavigate={onNavigate} />
+
+      <main className="flex-1 lg:ml-72 flex flex-col min-w-0">
+        <TopBar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+
+        <div className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full">
+          {/* Custom ERP Tabs */}
+          <div className="mb-8 border-b border-slate-200 no-print">
+            <nav className="-mb-px flex gap-6 overflow-x-auto">
+              {["Debtors Aging", "Tenant Statement", "Owner Report"].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-semibold transition-colors ${activeTab === tab
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </nav>
           </div>
-        </main>
-      </div>
+
+          <div className="pb-12">
+            {activeTab === "Debtors Aging" && (
+              <DebtorsAgingView
+                loadData={loadAging}
+                agingSummary={agingSummary}
+                rows={agingRows}
+                loadingSummary={loadingSummary}
+                loadingRows={loadingRows}
+                onSettle={(invoices) => {
+                  setSelectedInvoices(invoices);
+                  setShowPopup(true);
+                }}
+              />
+            )}
+            {activeTab === "Tenant Statement" && (
+              <TenantStatementView tenants={tenants} loadingTenants={loadingTenants} />
+            )}
+            {activeTab === "Owner Report" && (
+              <OwnerReportView />
+            )}
+          </div>
+        </div>
+      </main>
+
+      <CollectionReceiptPopup
+        isOpen={showPopup}
+        onClose={() => setShowPopup(false)}
+        selectedInvoices={selectedInvoices}
+        onSettled={() => {
+          setShowPopup(false);
+          loadAging(); // Live refresh
+        }}
+      />
     </div>
   );
 }

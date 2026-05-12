@@ -6,6 +6,23 @@ import {
   fetchInvoices,
 } from "./supabaseClient";
 
+/* ─── static demo data for chart sections ─── */
+const monthlyBars = [
+  { month: "Jun", invoiced: 165, collected: 154 },
+  { month: "Jul", invoiced: 160, collected: 153 },
+  { month: "Aug", invoiced: 171, collected: 160 },
+  { month: "Sep", invoiced: 176, collected: 166 },
+  { month: "Oct", invoiced: 172, collected: 145 },
+  { month: "Nov", invoiced: 184, collected: 151 },
+];
+
+const ownerBars = [
+  { owner: "External Investors", invoiced: 82, collected: 74 },
+  { owner: "Close Group", invoiced: 20, collected: 19 },
+  { owner: "Developer Pool", invoiced: 41, collected: 36 },
+];
+
+/* ─── tone helpers (original colours) ─── */
 function toneStyles(tone) {
   if (tone === "blue") return { border: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8", badge: "#dbeafe" };
   if (tone === "green") return { border: "#22c55e", bg: "#f0fdf4", text: "#15803d", badge: "#dcfce7" };
@@ -13,7 +30,8 @@ function toneStyles(tone) {
   return { border: "#ef4444", bg: "#fef2f2", text: "#b91c1c", badge: "#fee2e2" };
 }
 
-function TopBar({ setMobileOpen }) {
+/* ─── TopBar — new layout with two alert pills ─── */
+function TopBar({ mobileOpen, setMobileOpen }) {
   return (
     <header style={{
       background: "#0f2d5a",
@@ -38,12 +56,14 @@ function TopBar({ setMobileOpen }) {
         </div>
       </div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <span style={{ borderRadius: "20px", background: "rgba(239,68,68,0.18)", padding: "5px 14px", fontSize: "12px", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.35)" }}>Live Data</span>
+        <span style={{ borderRadius: "20px", background: "rgba(239,68,68,0.18)", padding: "5px 14px", fontSize: "12px", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.35)" }}>3 Leases Expiring in 30 Days</span>
+        <span style={{ borderRadius: "20px", background: "rgba(245,158,11,0.18)", padding: "5px 14px", fontSize: "12px", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.35)" }}>5 Units Uninvoiced - Nov 2025</span>
       </div>
     </header>
   );
 }
 
+/* ─── KPI Card (original colours) ─── */
 function KPICard({ card }) {
   const tone = toneStyles(card.tone);
   return (
@@ -59,6 +79,81 @@ function KPICard({ card }) {
   );
 }
 
+/* ─── Mini Bar Chart ─── */
+function MiniBarChart({ title, rightLabel, rows, maxValue }) {
+  const cols = rows.length;
+  return (
+    <section style={{ borderRadius: "12px", border: "1px solid #e5e7eb", background: "#fff", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+      <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>{title}</p>
+        <span style={{ borderRadius: "6px", background: "#f3f4f6", padding: "3px 8px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", color: "#6b7280" }}>{rightLabel}</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: "12px" }}>
+        {rows.map((item) => (
+          <div key={item.month || item.owner} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ height: "180px", width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "3px" }}>
+              <div
+                style={{
+                  width: "14px", borderRadius: "3px 3px 0 0",
+                  background: "#bfdbfe", border: "1px solid #3b82f6",
+                  height: `${Math.round((item.invoiced / maxValue) * 100)}%`
+                }}
+              />
+              <div
+                style={{
+                  width: "14px", borderRadius: "3px 3px 0 0",
+                  background: "#fef3c7", border: "1px solid #f59e0b",
+                  height: `${Math.round((item.collected / maxValue) * 100)}%`
+                }}
+              />
+            </div>
+            <p style={{ marginTop: "6px", fontSize: "11px", color: "#6b7280" }}>{item.month || item.owner}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", fontSize: "12px", color: "#6b7280" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <span style={{ width: "12px", height: "12px", borderRadius: "3px", background: "#bfdbfe", border: "1px solid #3b82f6", display: "inline-block" }} />
+          Invoiced
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <span style={{ width: "12px", height: "12px", borderRadius: "3px", background: "#fef3c7", border: "1px solid #f59e0b", display: "inline-block" }} />
+          Collected
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Donut Card ─── */
+function DonutCard() {
+  return (
+    <section style={{ borderRadius: "12px", border: "1px solid #e5e7eb", background: "#fff", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+      <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>Debtors Aging Analysis</p>
+        <span style={{ borderRadius: "6px", background: "#f3f4f6", padding: "3px 8px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", color: "#6b7280" }}>As of Nov 2025</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "16px 0" }}>
+        <div style={{
+          width: "220px", height: "220px", borderRadius: "50%", position: "relative",
+          background: "conic-gradient(#3b82f6 0 36%, #f59e0b 36% 64%, #ef4444 64% 84%, #22c55e 84% 100%)"
+        }}>
+          <div style={{ position: "absolute", inset: "48px", borderRadius: "50%", background: "#fff" }} />
+        </div>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px", marginTop: "12px", fontSize: "12px", color: "#6b7280" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#3b82f6", display: "inline-block" }} />Current</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />30–60 Days</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444", display: "inline-block" }} />&gt;60 Days</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />Settled</span>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Shared helpers ─── */
 function EmptyState({ message }) {
   return (
     <div style={{ textAlign: "center", padding: "48px 24px", color: "#9ca3af", fontSize: "14px" }}>
@@ -78,20 +173,25 @@ function LoadingSpinner() {
   );
 }
 
+/* ─── Top Overdue Tenants (with Days column) ─── */
 function TopOverdueTenants({ rows, loading, onNavigate }) {
   return (
     <section style={{ borderRadius: "12px", border: "1px solid #e5e7eb", background: "#fff", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
       <div style={{ marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <p style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>Top Overdue Tenants</p>
+        <button
+          onClick={() => onNavigate("Collections")}
+          style={{ borderRadius: "20px", border: "1px solid #d1d5db", padding: "4px 14px", fontSize: "12px", fontWeight: 500, color: "#374151", background: "#fff", cursor: "pointer" }}
+        >Settle →</button>
       </div>
       {loading ? <LoadingSpinner /> : rows.length === 0 ? (
         <EmptyState message="No overdue tenants" />
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: "500px", fontSize: "13px", borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: "520px", fontSize: "13px", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                {["Tenant", "Unit", "Outstanding", "Action"].map(h => (
+                {["Tenant", "Unit", "Outstanding", "Days", "Action"].map(h => (
                   <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -103,7 +203,12 @@ function TopOverdueTenants({ rows, loading, onNavigate }) {
                   <td style={{ padding: "10px 6px", color: "#6b7280" }}>{row.unit}</td>
                   <td style={{ padding: "10px 6px", color: "#dc2626", fontWeight: 600 }}>₹{row.total}</td>
                   <td style={{ padding: "10px 6px" }}>
-                    <button 
+                    <span style={{ borderRadius: "20px", background: "#fef3c7", padding: "2px 8px", fontSize: "11px", color: "#b45309", fontWeight: 500 }}>
+                      {row.days ?? "—"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "10px 6px" }}>
+                    <button
                       onClick={() => onNavigate("Collections")}
                       style={{ borderRadius: "20px", background: "#2563eb", padding: "4px 12px", fontSize: "11px", fontWeight: 600, color: "#fff", border: "none", cursor: "pointer" }}
                     >Settle</button>
@@ -118,12 +223,13 @@ function TopOverdueTenants({ rows, loading, onNavigate }) {
   );
 }
 
+/* ─── Uninvoiced Units ─── */
 function UninvoicedUnits({ rows, loading, onNavigate }) {
   return (
     <section style={{ borderRadius: "12px", border: "1px solid #fbbf24", background: "#fff", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
       <div style={{ marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
         <p style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>Uninvoiced Units — Current Period</p>
-        <button 
+        <button
           onClick={() => onNavigate("Invoicing")}
           style={{ borderRadius: "20px", background: "#2563eb", padding: "6px 16px", fontSize: "12px", fontWeight: 600, color: "#fff", border: "none", cursor: "pointer" }}
         >Generate Invoices →</button>
@@ -159,6 +265,7 @@ function UninvoicedUnits({ rows, loading, onNavigate }) {
   );
 }
 
+/* ─── Main export ─── */
 export default function LeaseOSDashboardUI({ onNavigate }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [kpiCards, setKpiCards] = useState([]);
@@ -192,7 +299,7 @@ export default function LeaseOSDashboardUI({ onNavigate }) {
     <div style={{ minHeight: "100vh", background: "var(--page-bg)", display: "flex" }}>
       <LeaseOSSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} currentPage="Dashboard" onNavigate={onNavigate} />
       <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
-        <TopBar setMobileOpen={setMobileOpen} />
+        <TopBar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>
 
           {error && (
@@ -216,11 +323,19 @@ export default function LeaseOSDashboardUI({ onNavigate }) {
             )}
           </section>
 
-          {/* Overdue + Uninvoiced */}
+          {/* Charts Row */}
           <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "16px" }}>
+            <MiniBarChart title="Invoicing Activity - Last 6 Months" rightLabel="Invoice vs Collection" rows={monthlyBars} maxValue={200} />
+            <DonutCard />
+          </section>
+
+          {/* Owner Chart + Overdue Table */}
+          <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "16px" }}>
+            <MiniBarChart title="Collection Efficiency by Owner Category" rightLabel="Nov 2025" rows={ownerBars} maxValue={90} />
             <TopOverdueTenants rows={overdueRows} loading={loading} onNavigate={onNavigate} />
           </section>
 
+          {/* Uninvoiced Units */}
           <UninvoicedUnits rows={uninvoicedRows} loading={false} onNavigate={onNavigate} />
         </div>
       </main>
