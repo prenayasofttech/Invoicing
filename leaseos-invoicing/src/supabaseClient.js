@@ -399,6 +399,7 @@ export async function fetchAgingSummary(projectId) {
     value: b.total > 0 ? `₹${(b.total / 100_000).toFixed(1)}L` : "₹0",
     meta: `${b.count} invoice${b.count !== 1 ? "s" : ""}`,
     tone: b.tone,
+    rawTotal: b.total,
   }));
 }
 
@@ -537,6 +538,36 @@ export async function fetchDashboardKPIs(projectId) {
     { label: "Overdue >60 Days", value: fmt(overdue60), sub: "Escalation recommended", trend: overdue60 > 0 ? "Critical" : "Clear", tone: "rose" },
   ];
 }
+
+/** Invoicing and Collection activity over the last 6 months */
+export async function fetchMonthlyInvoicingActivity(projectId) {
+  let q = supabase
+    .from("leaseos_invoices")
+    .select("billing_month, total_amount, collected_amount");
+  if (projectId) q = q.eq("project_id", projectId);
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const monthMap = {};
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const shortM = d.toLocaleString("en-IN", { month: "short" });
+    monthMap[mStr] = { month: shortM, invoiced: 0, collected: 0, billingMonth: mStr };
+  }
+
+  for (const r of data ?? []) {
+    if (monthMap[r.billing_month]) {
+      monthMap[r.billing_month].invoiced += Number(r.total_amount) || 0;
+      monthMap[r.billing_month].collected += Number(r.collected_amount) || 0;
+    }
+  }
+
+  return Object.values(monthMap);
+}
+
 
 /** Uninvoiced active leases = leases with no invoice for current month */
 export async function fetchUninvoicedLeases(projectId) {
