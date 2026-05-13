@@ -23,6 +23,10 @@ export default function SimpleLogin() {
       password,
     });
 
+    if (authError) {
+      console.log("Supabase Auth Error:", authError.message);
+      console.log("Current Supabase URL being used:", import.meta.env.VITE_SUPABASE_URL);
+    }
 
     if (!authError) {
       setLoading(false);
@@ -37,6 +41,9 @@ export default function SimpleLogin() {
         { p_email: normalizedEmail, p_password: password }
       );
 
+      if (rpcError) {
+        console.log("RPC Error:", rpcError);
+      }
 
       if (!rpcError && rpcData?.success) {
         await loginAsModuleUser({
@@ -52,17 +59,24 @@ export default function SimpleLogin() {
 
       // Show exact error for diagnosis
       const pathBMsg = rpcData?.message || rpcError?.message || null;
+      console.log("RPC Fallback Message:", pathBMsg);
 
       // User-friendly messages
       if (pathBMsg && !pathBMsg.toLowerCase().includes("function")) {
         // RPC ran — show its specific message
-        setError(pathBMsg);
+        // If this is an Admin account, the real error was authError!
+        if (pathBMsg === "User not found" && authError) {
+          setError(`Auth failed: ${authError.message} (And not found in modules)`);
+        } else {
+          setError(pathBMsg);
+        }
       } else if (authError.message?.toLowerCase().includes("email not confirmed")) {
         setError("Email not yet confirmed. Contact your company admin.");
       } else {
         setError("Login failed. Check your email and password, or contact your admin.");
       }
     } catch (err) {
+      console.log("Unexpected error during login:", err);
       setError(authError.message || "Login failed. Please try again.");
     }
 
