@@ -34,7 +34,7 @@ const EditProject = () => {
         const unique = [...new Set([...indianCities, ...fetched])].sort();
         setLocations(unique);
       } catch (error) {
-        console.error("Failed to fetch locations:", error);
+
         setLocations(indianCities);
       }
 
@@ -47,7 +47,7 @@ const EditProject = () => {
           return merged.length > 0 ? merged : prev;
         });
       } catch (error) {
-        console.error("Error fetching types:", error);
+
         // Keep default types on error — don't overwrite with empty
       }
     };
@@ -72,7 +72,7 @@ const EditProject = () => {
           status: data.status || "active"
         });
       } catch (error) {
-        console.error("Error fetching project:", error);
+
       }
     };
     fetchProject();
@@ -117,7 +117,7 @@ const EditProject = () => {
       setSubmitMessage('Project Updated successfully');
       setTimeout(() => navigate("/admin/projects"), 2000);
     } catch (error) {
-      console.error("Update error:", error);
+
       alert("Error updating project");
     }
   };

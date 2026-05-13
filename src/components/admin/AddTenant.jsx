@@ -60,7 +60,7 @@ const AddTenant = () => {
             const res = await getProjects();
             setProjects(res.data.data || res.data || []);
         } catch (err) {
-            console.error("Failed to fetch projects");
+
         }
     };
 
@@ -73,7 +73,7 @@ const AddTenant = () => {
             // Filter strictly vacant units
             setAvailableUnits(units.filter(u => u.status === 'vacant'));
         } catch (err) {
-            console.error("Failed to fetch units");
+
         }
     };
 
@@ -127,7 +127,7 @@ const AddTenant = () => {
             setSubmitMessage('Tenant created successfully');
             setTimeout(() => navigate('/admin/tenants'), 2000);
         } catch (err) {
-            console.error(err);
+
             alert('Failed to create tenant: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);

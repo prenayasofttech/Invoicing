@@ -44,7 +44,7 @@ const RejectedSubmissions = () => {
                 ];
                 setSubmissions(mockData);
             } catch (err) {
-                console.error(err);
+
             } finally {
                 setLoading(false);
             }

@@ -31,7 +31,7 @@ const TenantList = () => {
             const res = await tenantAPI.getLocations();
             if (res.data) setLocations(['All', ...res.data]);
         } catch (error) {
-            console.error("Failed to fetch locations");
+
         }
     };
 
@@ -46,7 +46,7 @@ const TenantList = () => {
             // Depending on backend response structure (array or {data: []})
             setTenants(Array.isArray(res.data) ? res.data : (res.data.data || []));
         } catch (error) {
-            console.error("Failed to fetch tenants", error);
+
         } finally {
             setLoading(false);
         }
@@ -58,7 +58,7 @@ const TenantList = () => {
                 await tenantAPI.deleteTenant(id);
                 setTenants(tenants.filter(t => t.id !== id));
             } catch (error) {
-                console.error("Failed to delete tenant", error);
+
                 alert("Failed to delete tenant");
             }
         }

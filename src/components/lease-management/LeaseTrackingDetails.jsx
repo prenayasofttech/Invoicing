@@ -18,7 +18,7 @@ const LeaseTrackingDetails = () => {
                 const res = await leaseAPI.getLeaseById(id);
                 setLease(res.data);
             } catch (err) {
-                console.error("Error fetching lease details:", err);
+
                 // Fallback mock data if ID not found or API fails (for demo purposes)
                 setLease({
                     id: id,

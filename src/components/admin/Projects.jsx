@@ -65,7 +65,7 @@ const Projects = () => {
         const unique = [...new Set([...apiLocations, ...indianCities])].sort();
         setAvailableLocations(["All", ...unique]);
       } catch (error) {
-        console.error("Error fetching locations:", error);
+
         setAvailableLocations(["All", ...indianCities]);
       }
     };
@@ -76,7 +76,7 @@ const Projects = () => {
         const apiTypes = response.data.data.map(t => t.option_value);
         setTypes(["All", ...apiTypes]);
       } catch (error) {
-        console.error("Error fetching types:", error);
+
         setTypes(["All", "RETAIL/SHOP", "Commercial", "Industrial", "Mixed Use"]);
       }
     };
@@ -121,7 +121,7 @@ const Projects = () => {
 
         setProjects(projectData);
       } catch (error) {
-        console.error("Error fetching projects:", error);
+
       } finally {
         setLoading(false);
       }
@@ -170,7 +170,7 @@ const Projects = () => {
         // Clear message after 3 seconds
         setTimeout(() => setMessage({ text: '', type: '' }), 3000);
       } catch (error) {
-        console.error("Error deleting project:", error);
+
         setMessage({
           text: error.response?.data?.error || "Failed to delete project",
           type: 'error'

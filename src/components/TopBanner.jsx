@@ -26,7 +26,7 @@ const TopBanner = () => {
           setAnnouncements(res.announcements);
         }
       } catch (err) {
-        console.error("Failed to fetch announcements:", err);
+
       }
     };
 

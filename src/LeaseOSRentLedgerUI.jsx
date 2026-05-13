@@ -8,6 +8,7 @@ import {
   fetchActiveTenantParties,
 } from "./supabaseClient";
 import CollectionReceiptPopup from "./CollectionReceiptPopup";
+import { useUser } from "./context/UserContext";
 
 function EmptyState({ message, icon = "📭" }) {
   return (
@@ -389,6 +390,7 @@ function OwnerReportView() {
 
 // ─── MAIN EXPORT ────────────────────────────────────────────────────────────
 export default function LeaseOSRentLedgerUI({ onNavigate }) {
+  const { companyId: userCompanyId, loadingAuth } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Debtors Aging");
 
@@ -409,23 +411,25 @@ export default function LeaseOSRentLedgerUI({ onNavigate }) {
   const loadAging = () => {
     setLoadingSummary(true);
     setLoadingRows(true);
-    fetchAgingSummary()
+    fetchAgingSummary(null, userCompanyId || undefined)
       .then(setAgingSummary)
-      .catch(console.error)
+      .catch(() => { })
       .finally(() => setLoadingSummary(false));
-    fetchAgingRows()
+    fetchAgingRows(null, userCompanyId || undefined)
       .then(setAgingRows)
-      .catch(console.error)
+      .catch(() => { })
       .finally(() => setLoadingRows(false));
   };
 
   useEffect(() => {
+    if (loadingAuth) return; // wait for auth to resolve before fetching
     loadAging();
-    fetchActiveTenantParties()
+    fetchActiveTenantParties(userCompanyId || undefined)
       .then(setTenants)
-      .catch(console.error)
+      .catch(() => { })
       .finally(() => setLoadingTenants(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userCompanyId, loadingAuth]);
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc] font-sans text-slate-900">

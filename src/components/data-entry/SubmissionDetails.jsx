@@ -16,7 +16,7 @@ const SubmissionDetails = () => {
                 const res = await getProjectById(id);
                 setProject(res.data);
             } catch (err) {
-                console.error("Error fetching submission details", err);
+
             } finally {
                 setLoading(false);
             }

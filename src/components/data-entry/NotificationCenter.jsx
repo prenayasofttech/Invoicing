@@ -68,7 +68,7 @@ const NotificationCenter = () => {
                     }
                 ]);
             } catch (err) {
-                console.error("Failed to load notifications", err);
+
             } finally {
                 setLoading(false);
             }

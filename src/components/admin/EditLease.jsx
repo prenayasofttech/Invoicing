@@ -96,7 +96,7 @@ const EditLease = () => {
                 setProjects(projectsRes.data?.data || []);
                 setParties(partiesRes.data || []);
             } catch (err) {
-                console.error('Failed to fetch data:', err);
+
             }
         };
         fetchDropdowns();
@@ -189,7 +189,7 @@ const EditLease = () => {
                 }
 
             } catch (err) {
-                console.error(err);
+
                 alert("Failed to load lease details");
             }
         };
@@ -224,7 +224,7 @@ const EditLease = () => {
                 }
             }
         } catch (e) {
-            console.error("Failed to fetch unit relations", e);
+
         }
     };
 
@@ -396,7 +396,7 @@ const EditLease = () => {
             const d = error.response?.data;
             const detail = d?.details || d?.hint || d?.code || '';
             const msg = d?.error || d?.message || error.message;
-            console.error('Update lease error:', d || error);
+
             alert("Failed to update lease: " + msg + (detail ? `\n[${detail}]` : ''));
         } finally {
             setIsSubmitting(false);

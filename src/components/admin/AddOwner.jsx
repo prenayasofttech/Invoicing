@@ -28,7 +28,7 @@ const AddOwner = () => {
         const res = await unitAPI.getUnits({ status: 'vacant' });
         setUnits(res.data.data || res.data || []);
       } catch (error) {
-        console.error("Failed to fetch vacant units", error);
+
       }
     };
     fetchUnits();
@@ -69,7 +69,7 @@ const AddOwner = () => {
       setSubmitMessage('Owner created successfully');
       setTimeout(() => navigate("/admin/owner"), 2000);
     } catch (err) {
-      console.error(err);
+
       alert("Failed to add owner: " + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);

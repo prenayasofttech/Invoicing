@@ -46,7 +46,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnon, {
 export async function fetchCompanies() {
   const { data, error } = await supabase
     .from("company_users")
-    .select("id, company_name")
+    .select("id, company_name, email")
     .order("company_name");
   if (error) throw error;
   return data ?? [];
@@ -74,7 +74,7 @@ export async function fetchOwnersByCompanyAndProject(companyId, projectId) {
     .from("unit_ownerships")
     .select(`
       party_id,
-      parties!inner(id, party_type, first_name, last_name, company_name, brand_name, owner_group, company_id)
+      parties!inner(id, party_type, first_name, last_name, company_name, brand_name, owner_group, company_id, email)
     `)
     .eq("units.project_id", projectId)
     .eq("ownership_status", "Active");
@@ -136,8 +136,8 @@ export async function fetchLeasesByProject(projectId) {
       rent_commencement_date,
       status,
       units!inner(id, unit_number, floor_number, block_tower, chargeable_area),
-      owner:parties!leases_party_owner_id_fkey(id, first_name, last_name, company_name, owner_group),
-      tenant:parties!leases_party_tenant_id_fkey(id, first_name, last_name, company_name, brand_name)
+      owner:parties!leases_party_owner_id_fkey(id, first_name, last_name, company_name, owner_group, email),
+      tenant:parties!leases_party_tenant_id_fkey(id, first_name, last_name, company_name, brand_name, email)
     `)
     .in("status", ["active", "Active"]);
 
@@ -184,7 +184,7 @@ export async function fetchLeasesForInvoicing(projectId, ownerPartyId) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Fetch invoices with filters */
-export async function fetchInvoices({ projectId, billingMonth, ownerPartyId, status } = {}) {
+export async function fetchInvoices({ projectId, billingMonth, ownerPartyId, status, companyId } = {}) {
   let q = supabase
     .from("leaseos_invoices")
     .select(`
@@ -194,8 +194,8 @@ export async function fetchInvoices({ projectId, billingMonth, ownerPartyId, sta
       collected_amount, balance_amount, status, notes,
       projects(project_name, location),
       units(unit_number, floor_number, chargeable_area),
-      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name, address_line1, address_line2, city, state, postal_code),
-      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, address_line1, address_line2, city, state, postal_code)
+      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name, address_line1, address_line2, city, state, postal_code, email),
+      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, address_line1, address_line2, city, state, postal_code, email)
     `)
     .order("invoice_date", { ascending: false });
 
@@ -203,6 +203,7 @@ export async function fetchInvoices({ projectId, billingMonth, ownerPartyId, sta
   if (billingMonth) q = q.eq("billing_month", billingMonth);
   if (ownerPartyId) q = q.eq("owner_party_id", ownerPartyId);
   if (status) q = q.eq("status", status);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -269,13 +270,35 @@ export async function settleInvoice(invoiceId, collectedAmount) {
   if (error) throw error;
 }
 
+export async function fetchCumulativeRevenueShare(leaseId) {
+  const { data, error } = await supabase
+    .from("revenue_share_entries")
+    .select("calculated_amount")
+    .eq("lease_id", leaseId);
+
+  if (error) {
+    return 0;
+  }
+  return data?.reduce((sum, r) => sum + (Number(r.calculated_amount) || 0), 0) || 0;
+}
+
+export async function createRevenueShareEntry(payload) {
+  const { error } = await supabase
+    .from("revenue_share_entries")
+    .insert([payload]);
+
+  if (error) {
+  }
+}
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  COLLECTIONS MODULE  (leaseos_collections table)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Outstanding invoices for one tenant party */
-export async function fetchOutstandingByTenant(tenantPartyId) {
+export async function fetchOutstandingByTenant(tenantPartyId, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select(`
@@ -283,12 +306,13 @@ export async function fetchOutstandingByTenant(tenantPartyId) {
       total_amount, collected_amount, balance_amount, status,
       tenant_party_id, owner_party_id, company_id, project_id, unit_id,
       units(unit_number), projects(project_name),
-      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name)
+      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, email)
     `)
     .in("status", ["Outstanding", "Overdue", "Partial"])
     .order("invoice_date", { ascending: true });
 
   if (tenantPartyId) q = q.eq("tenant_party_id", tenantPartyId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -300,16 +324,16 @@ export async function fetchOutstandingByTenant(tenantPartyId) {
 }
 
 /** All tenant parties that have active leases */
-export async function fetchActiveTenantParties() {
+export async function fetchActiveTenantParties(companyId) {
   const { data, error } = await supabase
     .from("leases")
-    .select("party_tenant_id, parties!leases_party_tenant_id_fkey(id, first_name, last_name, company_name, brand_name), units(unit_number)")
+    .select("party_tenant_id, parties!leases_party_tenant_id_fkey(id, first_name, last_name, company_name, brand_name, company_id, email), units(unit_number)")
     .in("status", ["active", "Active"]);
   if (error) throw error;
 
   const seen = new Set();
   return (data ?? [])
-    .filter((r) => r.party_tenant_id && !seen.has(r.party_tenant_id) && (seen.add(r.party_tenant_id), true))
+    .filter((r) => r.party_tenant_id && (!companyId || String(r.parties?.company_id) === String(companyId)) && !seen.has(r.party_tenant_id) && (seen.add(r.party_tenant_id), true))
     .map((r) => ({
       id: r.parties?.id,
       display_name: r.parties?.brand_name || r.parties?.company_name || `${r.parties?.first_name || ""} ${r.parties?.last_name || ""}`.trim(),
@@ -318,7 +342,7 @@ export async function fetchActiveTenantParties() {
 }
 
 /** Recent collections — last 30 days */
-export async function fetchRecentCollections(projectId) {
+export async function fetchRecentCollections(projectId, companyId) {
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
@@ -331,12 +355,13 @@ export async function fetchRecentCollections(projectId) {
       invoice:leaseos_invoices(invoice_no),
       projects(project_name),
       units(unit_number),
-      tenant:parties!leaseos_collections_tenant_party_id_fkey(first_name, last_name, company_name, brand_name)
+      tenant:parties!leaseos_collections_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, email)
     `)
     .gte("receipt_date", since.toISOString().split("T")[0])
     .order("receipt_date", { ascending: false });
 
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -370,12 +395,13 @@ export async function createCollection(payload) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Compute aging buckets from outstanding invoices */
-export async function fetchAgingSummary(projectId) {
+export async function fetchAgingSummary(projectId, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select("balance_amount, invoice_date")
     .in("status", ["Outstanding", "Overdue", "Partial"]);
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -404,16 +430,17 @@ export async function fetchAgingSummary(projectId) {
 }
 
 /** Per-tenant aging detail rows */
-export async function fetchAgingRows(projectId) {
+export async function fetchAgingRows(projectId, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select(`
       id, invoice_no, company_id, project_id, unit_id, tenant_party_id, owner_party_id, balance_amount, invoice_date,
-      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name),
+      tenant:parties!leaseos_invoices_tenant_party_id_fkey(first_name, last_name, company_name, brand_name, email),
       units(unit_number)
     `)
     .in("status", ["Outstanding", "Overdue", "Partial"]);
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -464,16 +491,17 @@ export async function fetchTenantStatement(tenantPartyId) {
 }
 
 /** Owner-wise collection summary for a billing month */
-export async function fetchOwnerReport(projectId, billingMonth) {
+export async function fetchOwnerReport(projectId, billingMonth, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select(`
       owner_party_id, total_amount, collected_amount, balance_amount, unit_id,
-      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name, owner_group)
+      owner:parties!leaseos_invoices_owner_party_id_fkey(first_name, last_name, company_name, owner_group, email)
     `);
 
   if (projectId) q = q.eq("project_id", projectId);
   if (billingMonth) q = q.eq("billing_month", billingMonth);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -505,11 +533,12 @@ export async function fetchOwnerReport(projectId, billingMonth) {
 //  DASHBOARD KPIs
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function fetchDashboardKPIs(projectId) {
+export async function fetchDashboardKPIs(projectId, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select("total_amount, collected_amount, balance_amount, status, invoice_date");
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -540,11 +569,12 @@ export async function fetchDashboardKPIs(projectId) {
 }
 
 /** Invoicing and Collection activity over the last 6 months */
-export async function fetchMonthlyInvoicingActivity(projectId) {
+export async function fetchMonthlyInvoicingActivity(projectId, companyId) {
   let q = supabase
     .from("leaseos_invoices")
     .select("billing_month, total_amount, collected_amount");
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -570,7 +600,7 @@ export async function fetchMonthlyInvoicingActivity(projectId) {
 
 
 /** Uninvoiced active leases = leases with no invoice for current month */
-export async function fetchUninvoicedLeases(projectId) {
+export async function fetchUninvoicedLeases(projectId, companyId) {
   const now = new Date();
   const billingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -579,10 +609,16 @@ export async function fetchUninvoicedLeases(projectId) {
   // Get already-invoiced lease IDs for this month
   let q = supabase.from("leaseos_invoices").select("lease_id").eq("billing_month", billingMonth);
   if (projectId) q = q.eq("project_id", projectId);
+  if (companyId) q = q.eq("company_id", companyId);
   const { data: invoiced } = await q;
   const invoicedSet = new Set((invoiced ?? []).map((r) => r.lease_id));
 
-  return leases.filter((l) => !invoicedSet.has(l.id));
+  // Also scope leases by company_id if companyId provided
+  const scopedLeases = companyId
+    ? leases.filter((l) => String(l.company_id) === String(companyId))
+    : leases;
+
+  return scopedLeases.filter((l) => !invoicedSet.has(l.id));
 }
 
 export async function fetchTenantBankDetails(partyId) {

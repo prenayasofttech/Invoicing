@@ -89,7 +89,7 @@ const Units = () => {
                 const projData = response.data.data || response.data;
                 setProjects(projData);
             } catch (err) {
-                console.error("Error fetching projects:", err);
+
             }
         };
         fetchProjectsList();
@@ -141,7 +141,7 @@ const Units = () => {
                 setUnits(mappedUnits);
                 setError(null);
             } catch (err) {
-                console.error('Fetch error:', err);
+
                 setError(err.message || 'Failed to fetch units');
                 setUnits([]);
             } finally {
@@ -176,7 +176,7 @@ const Units = () => {
                 await unitAPI.deleteUnit(id);
                 setUnits(units.filter(unit => unit.id !== id));
             } catch (err) {
-                console.error('Error deleting unit:', err);
+
                 alert('Failed to delete unit');
             }
         }

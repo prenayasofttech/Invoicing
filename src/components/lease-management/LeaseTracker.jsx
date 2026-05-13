@@ -34,7 +34,7 @@ const LeaseTracker = () => {
                 const leasesRes = await leaseAPI.getAllLeases({ status: 'active' });
                 setLeases(leasesRes.data);
             } catch (err) {
-                console.error(err);
+
             } finally {
                 setLoading(false);
             }

@@ -31,7 +31,7 @@ const LeaseReminders = () => {
       setUiMessage({ text: 'Reminder sent successfully!', type: 'success' });
       setTimeout(() => setUiMessage({ text: '', type: '' }), 3000);
     } catch (error) {
-      console.error(error);
+
       setUiMessage({ text: 'Failed to send reminder.', type: 'error' });
       setShowModal(false);
     }

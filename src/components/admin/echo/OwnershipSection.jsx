@@ -24,7 +24,7 @@ const OwnershipSection = ({ units = [], leases = [], loading }) => {
       'Unsold': { units: 0, totalArea: 0, totalRent: 0, parties: new Set() },
     };
 
-    console.log('[OwnershipSection] units:', units?.length, 'leases:', leases?.length);
+
 
     if (!units || units.length === 0) {
       return allCategories.map(cat => ({
@@ -50,7 +50,7 @@ const OwnershipSection = ({ units = [], leases = [], loading }) => {
       // Skip units whose status is explicitly 'sold' (case-insensitive)
       // NOTE: In this app 'sold' means the ownership has already been fully finalized.
       if ((unit.status || '').toLowerCase() === 'sold') {
-        console.log(`[OwnershipSection] SKIP sold unit ${unit.id} (${unit.unit_number})`);
+`);
         return;
       }
 
@@ -60,7 +60,7 @@ const OwnershipSection = ({ units = [], leases = [], loading }) => {
       // Any grouping not in the map falls back to 'Other Assigned' (never lost to Unsold)
       const bucket = grouped[grouping] ?? grouped['Other Assigned'];
 
-      console.log(`[OwnershipSection] unit ${unit.id} (${unit.unit_number}): owner="${unit.owner_name}" grouping="${grouping}"`);
+: owner="${unit.owner_name}" grouping="${grouping}"`);
 
       bucket.units += 1;
       bucket.totalArea += parseFloat(unit.chargeable_area || 0);

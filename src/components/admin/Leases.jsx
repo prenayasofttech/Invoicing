@@ -85,7 +85,7 @@ const Leases = () => {
                     setLeaseStatuses(leaseStatusesRes.data.data.map(t => t.option_value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())));
                 }
             } catch (err) {
-                console.error('Failed to fetch initial filter data:', err);
+
             }
         };
 
@@ -150,7 +150,7 @@ const Leases = () => {
 
             setLeases(fetchedLeases);
         } catch (err) {
-            console.error('Failed to fetch leases:', err);
+
             setLeases([]);
         } finally {
             setLoading(false);
@@ -174,7 +174,7 @@ const Leases = () => {
                 await leaseAPI.deleteLease(id);
                 setLeases(leases.filter(l => l.id !== id));
             } catch (err) {
-                console.error('Failed to delete lease:', err);
+
                 const errorMsg = err.response?.data?.message || 'Failed to delete lease. It may have dependencies.';
                 alert(errorMsg);
             }

@@ -22,7 +22,7 @@ const LeaseDashboard = () => {
         const { data } = await leaseAPI.getLeaseManagerStats();
         setStats(data);
       } catch (error) {
-        console.error("Error fetching stats:", error);
+
       } finally {
         setLoading(false);
       }

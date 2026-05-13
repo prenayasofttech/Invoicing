@@ -15,7 +15,7 @@ const ViewParty = () => {
                 const res = await partyAPI.getPartyById(id);
                 setParty(res.data);
             } catch (err) {
-                console.error("Error fetching party:", err);
+
             } finally {
                 setLoading(false);
             }

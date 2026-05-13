@@ -46,7 +46,7 @@ const PastEntries = () => {
                     setSubmissions(data);
                 }
             } catch (err) {
-                console.error(err);
+
                 // Fallback mock data on error
                 const mockData = [
                     { id: 8821, property: 'Grandview Apartments', subtitle: 'Unit 402, North Wing', type: 'Lease Agreement', submitted: 'Oct 24, 2023', status: 'Rejected', rejectionReason: 'Missing official signature on page 4 and appendix B. Please re-scan with all required stamps.' },

@@ -43,7 +43,7 @@ const OwnershipDataEntry = () => {
             const res = await getProjects();
             setProjects(Array.isArray(res.data) ? res.data : (res.data?.data || []));
         } catch (error) {
-            console.error(error);
+
         }
     };
 
@@ -62,7 +62,7 @@ const OwnershipDataEntry = () => {
             });
             setUnits(filteredUnits);
         } catch (error) {
-            console.error(error);
+
         }
     };
 
@@ -75,7 +75,7 @@ const OwnershipDataEntry = () => {
             const active = owners.find(o => o.ownership_status === 'Active');
             setCurrentOwner(active || null);
         } catch (error) {
-            console.error("Failed to fetch ownerships", error);
+
         } finally {
             // setLoading(false);
         }

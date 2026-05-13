@@ -39,7 +39,7 @@ const OwnerDetails = () => {
       setDocuments(docsResponse.data || []);
 
     } catch (err) {
-      console.error("Error fetching owner details:", err);
+
       setError("Failed to load owner details.");
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ const OwnerDetails = () => {
           const response = await unitAPI.getUnits({ status: 'vacant' });
           setAvailableUnits(response.data.data || response.data || []);
         } catch (err) {
-          console.error("Failed to fetch units:", err);
+
         }
       };
       fetchUnits();
@@ -86,7 +86,7 @@ const OwnerDetails = () => {
       setDocuments(docsResponse.data || []);
       alert('Document uploaded successfully');
     } catch (err) {
-      console.error("Upload failed", err);
+
       alert('Failed to upload document');
     } finally {
       setUploading(false);
@@ -111,7 +111,7 @@ const OwnerDetails = () => {
       fetchDetails(); // Refresh details to show new units
       alert("Units added successfully");
     } catch (err) {
-      console.error("Failed to add units:", err);
+
       alert("Failed to add units. Please try again.");
     }
   };

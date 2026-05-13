@@ -68,7 +68,7 @@ const AddUnit = () => {
 
                 setProjects(projectData);
             } catch (err) {
-                console.error("Failed to fetch projects", err);
+
             }
         };
         const fetchFilters = async () => {
@@ -101,7 +101,7 @@ const AddUnit = () => {
                     setUnitZoningTypes(zoneRes.data.data.map(t => ({ value: t.option_value, label: t.option_value })));
                 }
             } catch (error) {
-                console.error("Error fetching filters", error);
+
             }
         };
         fetchProjects();
@@ -124,7 +124,7 @@ const AddUnit = () => {
                 // If block is selected, filter floors by it? Wait, API can do that if we passed block_id, but here let's just get all project floors. Actually floor_name is what we need.
                 setFloors((fRes.data?.data || []).map(f => f.floor_name));
             } catch (err) {
-                console.error("Failed to load unit structure", err);
+
             }
         };
         loadStructure();
@@ -305,7 +305,7 @@ const AddUnit = () => {
             setTimeout(() => navigate('/admin/units'), 2000);
 
         } catch (error) {
-            console.error("Create unit failed:", error);
+
             setSubmitMessage('Failed to create unit. ' + handleApiError(error));
         } finally {
             setIsSubmitting(false);
