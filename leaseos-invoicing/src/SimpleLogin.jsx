@@ -26,6 +26,7 @@ export default function SimpleLogin() {
     if (authError) {
       console.log("Supabase Auth Error:", authError.message);
       console.log("Current Supabase URL being used:", import.meta.env.VITE_SUPABASE_URL);
+      console.log("Exact Email being sent:", `"${normalizedEmail}"`);
     }
 
     if (!authError) {
@@ -36,6 +37,7 @@ export default function SimpleLogin() {
     // ── PATH B: Fallback — verify via module_users bcrypt RPC ─────────────────
 
     try {
+      console.log("Attempting RPC verify_module_user with email:", `"${normalizedEmail}"`);
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         "verify_module_user",
         { p_email: normalizedEmail, p_password: password }
