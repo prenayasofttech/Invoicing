@@ -35,7 +35,7 @@ const SearchFilters = () => {
       // but I can add it or use a raw API call.
       // better: use API.get directly if managementAPI is restrictive, but let's assume I add it or use a relative path
     } catch (err) {
-      console.error("Search failed:", err);
+
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ const SearchFilters = () => {
       const data = await response.json();
       setResults(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Search error", error);
+
     } finally {
       setLoading(false);
     }

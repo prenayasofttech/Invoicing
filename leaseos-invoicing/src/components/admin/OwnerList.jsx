@@ -35,7 +35,7 @@ const OwnerList = () => {
       const unique = [...new Set([...apiLocations, ...indianCities])].sort();
       setLocations(['All', ...unique]);
     } catch (error) {
-      console.error("Failed to fetch locations");
+
       setLocations(['All', ...indianCities]);
     }
   };
@@ -50,7 +50,7 @@ const OwnerList = () => {
       const res = await ownerAPI.getOwners(params);
       setOwners(res.data.data || res.data || []);
     } catch (error) {
-      console.error("Failed to fetch owners", error);
+
     } finally {
       setLoading(false);
     }
@@ -69,7 +69,7 @@ const OwnerList = () => {
               setTimeout(() => setSuccessMsg(''), 3000);
 
           } catch (error) {
-              console.error("Failed to delete owner", error);
+
               alert("Failed to delete owner. They might be linked to active leases.");
           }
       }

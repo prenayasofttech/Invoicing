@@ -39,7 +39,7 @@ const SessionKilledAlert = () => {
           table: 'session_kill_notifications' 
         },
         (payload) => {
-          console.log('Session kill notification received:', payload);
+
           if (payload.new && payload.new.company_user_id === userId) {
             setMessage(payload.new.message || 'Your session has been terminated by an administrator.');
             setShowAlert(true);
@@ -92,7 +92,7 @@ const SessionKilledAlert = () => {
           }, 3000);
         }
       } catch (err) {
-        console.error('Error checking session kill notifications:', err);
+
       }
     };
 

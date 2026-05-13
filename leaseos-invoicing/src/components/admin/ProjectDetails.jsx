@@ -34,7 +34,7 @@ const ProjectDetails = () => {
                 setOwners(projRes.data.owners || []);
 
             } catch (error) {
-                console.error("Error fetching project details:", error);
+
             } finally {
                 setLoading(false);
             }

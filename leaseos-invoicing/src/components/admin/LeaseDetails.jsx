@@ -24,7 +24,7 @@ const LeaseDetails = () => {
             const res = await leaseAPI.getLeaseById(id);
             setLease(res.data);
         } catch (err) {
-            console.error('Failed to fetch lease:', err);
+
             setLease(null);
         } finally {
             setLoading(false);

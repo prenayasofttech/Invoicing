@@ -78,7 +78,7 @@ const OwnershipMapping = () => {
             const res = await ownershipAPI.getAllOwnerships({ search: globalSearch });
             setSearchResults(res.data || []);
         } catch (e) {
-            console.error("Search failed", e);
+
         } finally {
             setIsSearching(false);
         }
@@ -158,7 +158,7 @@ const OwnershipMapping = () => {
                 setDocumentTypes(types);
             }
         } catch (error) {
-            console.error("Failed to fetch types", error);
+
             // Use defaults on error
             setDocumentTypes([
                 { id: 1, name: 'Application For Allotment' },
@@ -174,10 +174,10 @@ const OwnershipMapping = () => {
     const fetchDocuments = async (unitId, partyId) => {
         try {
             const res = await ownershipAPI.getDocuments(unitId, partyId);
-            console.log('Fetched documents:', res.data);
+
             setDocuments(res.data || []);
         } catch (error) {
-            console.error("Failed to fetch docs", error);
+
         }
     };
 
@@ -222,7 +222,7 @@ const OwnershipMapping = () => {
             setRefreshDocs(prev => prev + 1);
         } catch (error) {
             const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Unknown error";
-            console.error("Upload error:", error.response?.data || error);
+
             alert("Failed to upload: " + errorMsg);
         }
     };
@@ -450,7 +450,7 @@ const OwnershipMapping = () => {
                                                 const doc = documents.find(d =>
                                                     String(d.document_type_id) === String(type.id)
                                                 );
-                                                console.log(`Type: ${type.name} (id=${type.id}), Found doc:`, doc);
+, Found doc:`, doc);
 
                                                 return (
                                                     <div key={index} className="doc-row" style={{

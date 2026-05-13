@@ -18,7 +18,7 @@ const OwnershipDocumentMaster = () => {
             const res = await ownershipAPI.getDocumentTypes();
             setDocTypes(res.data || []);
         } catch (error) {
-            console.error("Failed to fetch types", error);
+
         } finally {
             setLoading(false);
         }

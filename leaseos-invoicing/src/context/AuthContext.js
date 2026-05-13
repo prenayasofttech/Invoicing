@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
           setUser(companyUser);
           setSession({ access_token: companyToken }); // Mock session for compatibility
         } catch (e) {
-          console.error('Error parsing company user:', e);
+
         }
       }
       setLoading(false);

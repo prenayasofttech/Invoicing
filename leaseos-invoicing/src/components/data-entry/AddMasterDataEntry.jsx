@@ -43,7 +43,7 @@ const AddMasterDataEntry = () => {
                 const bcRes = await filterAPI.getFilterOptions("brand_category");
                 setBrandCategories(bcRes.data.data || []);
             } catch (e) {
-                console.error(e);
+
             }
         };
         fetchFilters();
@@ -90,7 +90,7 @@ const AddMasterDataEntry = () => {
             await partyAPI.createParty(formData);
             navigate('/data-entry/add-master-data');
         } catch (error) {
-            console.error("Failed to create party", error);
+
             alert("Failed to create party. Please check the inputs.");
         } finally {
             setLoading(false);

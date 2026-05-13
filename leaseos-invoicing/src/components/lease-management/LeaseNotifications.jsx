@@ -64,7 +64,7 @@ const LeaseNotifications = () => {
                 setNotifications(mockNotifications);
             }
         } catch (error) {
-            console.error("Failed to load notifications", error);
+
             setNotifications(mockNotifications);
         } finally {
             setLoading(false);
@@ -78,7 +78,7 @@ const LeaseNotifications = () => {
             const updated = notifications.map(n => ({ ...n, read: true }));
             setNotifications(updated);
         } catch (error) {
-            console.error(error);
+
         }
     };
 
@@ -88,7 +88,7 @@ const LeaseNotifications = () => {
                 await leaseAPI.deleteAllNotifications();
                 setNotifications([]);
             } catch (error) {
-                console.error(error);
+
             }
         }
     };

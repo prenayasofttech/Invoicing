@@ -42,7 +42,7 @@ const EditOwner = () => {
 
         setLoading(false);
       } catch (err) {
-        console.error(err);
+
         alert("Failed to load owner");
         navigate("/admin/owner");
       }
@@ -68,7 +68,7 @@ const EditOwner = () => {
       setSubmitMessage('Owner updated successfully');
       setTimeout(() => navigate("/admin/owner"), 2000);
     } catch (err) {
-      console.error(err);
+
       alert("Failed to update owner");
     }
   };

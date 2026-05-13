@@ -93,7 +93,7 @@ const AddLease = () => {
                 setProjects(projectsRes.data?.data || []);
                 setParties(partiesRes.data || []);
             } catch (err) {
-                console.error('Failed to fetch data:', err);
+
                 alert('Error loading form data');
             }
         };
@@ -129,7 +129,7 @@ const AddLease = () => {
                 }
             }
         } catch (e) {
-            console.error("Failed to fetch unit relations", e);
+
         }
     };
 
@@ -381,13 +381,13 @@ const AddLease = () => {
             if (files.agreement_document) formDataPayload.append('agreement_document', files.agreement_document);
             if (files.registration_document) formDataPayload.append('registration_document', files.registration_document);
 
-            console.log("Submitting Lease Payload:", payload);
+
             await leaseAPI.createLease(formDataPayload);
             setSubmitMessage('Lease created successfully!');
             setTimeout(() => navigate('/admin/leases'), 2000);
 
         } catch (error) {
-            console.error(error);
+
             alert("Failed to create lease: " + handleApiError(error));
         } finally {
             setIsSubmitting(false);

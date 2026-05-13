@@ -80,7 +80,7 @@ const Settings = () => {
                 });
             }
         } catch (e) {
-            console.error("Error reading user from localStorage:", e);
+
         } finally {
             setLoading(false);
         }
@@ -190,7 +190,7 @@ const Settings = () => {
                 alert("Data wiped successfully! You can now start fresh.");
             })
             .catch((err) => {
-                console.error("Wipe failed:", err);
+
                 setMessage({ text: 'Failed to wipe data: ' + (err.response?.data?.message || err.message), type: 'error' });
             });
     };

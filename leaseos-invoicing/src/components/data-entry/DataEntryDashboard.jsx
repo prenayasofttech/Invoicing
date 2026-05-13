@@ -35,7 +35,7 @@ const DataEntryDashboard = () => {
             setStats(statsRes.data);
 
         } catch (error) {
-            console.error("Error fetching dashboard data", error);
+
         } finally {
             setLoading(false);
         }

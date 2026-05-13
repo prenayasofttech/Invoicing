@@ -16,7 +16,7 @@ const PendingProjects = () => {
                 const response = await getProjects({ status: 'pending' });
                 setProjects(response.data.data || []);
             } catch (error) {
-                console.error("Error fetching pending projects", error);
+
             } finally {
                 setLoading(false);
             }

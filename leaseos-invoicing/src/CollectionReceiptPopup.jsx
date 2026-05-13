@@ -114,7 +114,6 @@ export default function CollectionReceiptPopup({ isOpen, onClose, selectedInvoic
       if (onSettled) onSettled();
       onClose();
     } catch (err) {
-      console.error(err);
       alert("Failed to record collection.");
     } finally {
       setSubmitting(false);

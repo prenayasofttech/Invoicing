@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import LeaseOSSidebar from "./LeaseOSSidebar";
 import { fetchActiveTenantParties, fetchOutstandingByTenant, fetchRecentCollections } from "./supabaseClient";
 import CollectionReceiptPopup from "./CollectionReceiptPopup";
+import { useUser } from "./context/UserContext";
 
 function EmptyState({ message }) {
   return (
@@ -53,6 +54,7 @@ function Header({ mobileOpen, setMobileOpen }) {
 }
 
 export default function LeaseOSCollectionsUI({ onNavigate }) {
+  const { companyId: userCompanyId, permissions, loadingAuth } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tenants, setTenants] = useState([]);
   const [selectedTenant, setSelectedTenant] = useState("");
@@ -76,24 +78,26 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
   // Load tenants + recent collections on mount
   const loadRecent = () => {
     setLoadingCollections(true);
-    fetchRecentCollections()
+    fetchRecentCollections(null, userCompanyId || undefined)
       .then(setRecentCollections)
       .catch(console.error)
       .finally(() => setLoadingCollections(false));
   };
 
   useEffect(() => {
-    fetchActiveTenantParties()
+    if (loadingAuth) return; // wait until auth resolves
+    fetchActiveTenantParties(userCompanyId || undefined)
       .then(setTenants)
-      .catch(console.error)
+      .catch(() => { })
       .finally(() => setLoadingTenants(false));
 
     loadRecent();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userCompanyId, loadingAuth]);
 
   const loadOutstanding = () => {
     setLoadingOutstanding(true);
-    fetchOutstandingByTenant(selectedTenant)
+    fetchOutstandingByTenant(selectedTenant, userCompanyId || undefined)
       .then((rows) => {
         setOutstandingRows(rows);
         const init = {};
@@ -182,18 +186,28 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                       <option key={i} value={t.id}>{t.display_name} ({t.unit_no})</option>
                     ))}
                   </select>
-                  <button
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    onClick={() => {
-                      if (outstandingRows.length === 0) return;
-                      const allChecked = {};
-                      outstandingRows.forEach(r => allChecked[r.id] = true);
-                      setCheckedInvoices(allChecked);
-                      setTimeout(() => setShowSettlePopup(true), 50);
-                    }}
-                  >
-                    Auto Adjust
-                  </button>
+                  {permissions?.edit ? (
+                    <button
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+                      onClick={() => {
+                        if (outstandingRows.length === 0) return;
+                        const allChecked = {};
+                        outstandingRows.forEach(r => allChecked[r.id] = true);
+                        setCheckedInvoices(allChecked);
+                        setTimeout(() => setShowSettlePopup(true), 50);
+                      }}
+                    >
+                      Auto Adjust
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      title="You do not have permission to settle invoices"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400 bg-slate-50 cursor-not-allowed flex items-center gap-1"
+                    >
+                      🔒 Auto Adjust
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -262,13 +276,23 @@ export default function LeaseOSCollectionsUI({ onNavigate }) {
                             setCheckedInvoices(all);
                           }}
                         >Select All Outstanding</button>
-                        <button
-                          className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
-                          disabled={selectedInvoices.length === 0}
-                          onClick={openSettlePopup}
-                        >
-                          Open Settlement →
-                        </button>
+                        {permissions?.edit ? (
+                          <button
+                            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
+                            disabled={selectedInvoices.length === 0}
+                            onClick={openSettlePopup}
+                          >
+                            Open Settlement →
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            title="You do not have permission to settle invoices"
+                            className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed flex items-center gap-1"
+                          >
+                            🔒 Open Settlement →
+                          </button>
+                        )}
                       </div>
                     </div>
                   </>

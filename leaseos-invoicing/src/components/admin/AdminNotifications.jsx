@@ -41,7 +41,7 @@ const AdminNotifications = () => {
             setNotifications(all);
 
         } catch (error) {
-            console.error("Failed to fetch notifications", error);
+
         } finally {
             setLoading(false);
         }
@@ -52,7 +52,7 @@ const AdminNotifications = () => {
             await leaseAPI.markAllNotificationsRead();
             fetchNotifications();
         } catch (error) {
-            console.error("Failed to mark read");
+
         }
     };
 
@@ -62,7 +62,7 @@ const AdminNotifications = () => {
                 await leaseAPI.deleteAllNotifications();
                 setNotifications([]);
             } catch (error) {
-                console.error("Failed to delete notifications");
+
             }
         }
     };

@@ -104,7 +104,7 @@ const Login = () => {
       const modulesAccess = data.user.modules_access;
       if ((isModuleUser || isProjectUser) && Array.isArray(modulesAccess) && modulesAccess.length > 0) {
         sessionStorage.setItem('modules_access', JSON.stringify(modulesAccess));
-        console.log('[Login] modules_access stored:', modulesAccess.map(m => m.module_name));
+);
       } else if (isModuleUser && data.user.module_name) {
         // Fallback: build single-entry array from primary module
         const fallback = [{
@@ -112,7 +112,7 @@ const Login = () => {
           permissions: data.user.permissions || { view: true, edit: false, delete: false },
         }];
         sessionStorage.setItem('modules_access', JSON.stringify(fallback));
-        console.log('[Login] modules_access fallback:', data.user.module_name);
+
       } else {
         sessionStorage.removeItem('modules_access');
       }
@@ -121,7 +121,7 @@ const Login = () => {
       const projectsAccess = data.user.projects_access;
       if (Array.isArray(projectsAccess) && projectsAccess.length > 0) {
         sessionStorage.setItem('projects_access', JSON.stringify(projectsAccess));
-        console.log('[Login] projects_access stored:', projectsAccess.map(p => p.project_name));
+);
       } else {
         sessionStorage.removeItem('projects_access');
       }

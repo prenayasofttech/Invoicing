@@ -42,7 +42,7 @@ const LeaseList = () => {
             }
             setLeases(fetchedLeases);
         } catch (error) {
-            console.error("Error fetching leases:", error);
+
         } finally {
             setLoading(false);
         }

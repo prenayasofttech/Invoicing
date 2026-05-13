@@ -96,7 +96,7 @@ const EditTenant = () => {
                 }
 
             } catch (err) {
-                console.error("Error loading tenant data:", err);
+
                 setError("Failed to load tenant details.");
             } finally {
                 setLoading(false);
@@ -122,7 +122,7 @@ const EditTenant = () => {
             const unitsList = res.data?.data || [];
             setUnits(Array.isArray(unitsList) ? unitsList : []);
         } catch (err) {
-            console.error("Error fetching units:", err);
+
             setUnits([]);
         } finally {
             setLoadingUnits(false);
@@ -216,7 +216,7 @@ const EditTenant = () => {
         } catch (err) {
             const serverError = err.response?.data?.error || err.response?.data?.message || err.message;
             setError(`Update failed: ${serverError}`);
-            console.error("Update error details:", err.response?.data);
+
         } finally {
             setSaving(false);
         }
