@@ -8,6 +8,7 @@ import {
   fetchAgingSummary,
   fetchOwnerReport
 } from "./supabaseClient";
+import { useUser } from "./context/UserContext";
 
 function toneStyles(tone) {
   if (tone === "blue") return { border: "#3b82f6", bg: "#eff6ff", text: "#1d4ed8", badge: "#dbeafe" };
@@ -500,6 +501,7 @@ function UninvoicedUnits({ rows, loading, onNavigate }) {
 }
 
 export default function LeaseOSDashboardUI({ onNavigate }) {
+  const { companyId: userCompanyId, loadingAuth } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [kpiCards, setKpiCards] = useState([]);
   const [overdueRows, setOverdueRows] = useState([]);
@@ -511,17 +513,19 @@ export default function LeaseOSDashboardUI({ onNavigate }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (loadingAuth) return; // wait for auth to resolve before fetching
     async function load() {
       setLoading(true);
       setError(null);
       try {
+        const cId = userCompanyId || undefined;
         const [kpis, aging, uninvoicedLeases, activity, agingSummary, owners] = await Promise.all([
-          fetchDashboardKPIs(),
-          fetchAgingRows(),
-          fetchUninvoicedLeases(),
-          fetchMonthlyInvoicingActivity(),
-          fetchAgingSummary(),
-          fetchOwnerReport()
+          fetchDashboardKPIs(null, cId),
+          fetchAgingRows(null, cId),
+          fetchUninvoicedLeases(null, cId),
+          fetchMonthlyInvoicingActivity(null, cId),
+          fetchAgingSummary(null, cId),
+          fetchOwnerReport(null, null, cId)
         ]);
         const displayKpis = kpis.map((c, i) => mapKpiForDisplay(c, i));
         setKpiCards(displayKpis);
@@ -556,14 +560,14 @@ export default function LeaseOSDashboardUI({ onNavigate }) {
         }
         setOwnerData(Object.entries(ownerCats).map(([cat, d]) => ({ category: cat, invoiced: d.invoiced, collected: d.collected })));
       } catch (err) {
-        console.error("Dashboard load error:", err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userCompanyId, loadingAuth]);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--page-bg)", display: "flex" }}>

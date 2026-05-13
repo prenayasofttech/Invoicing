@@ -24,7 +24,7 @@ const ApprovedSubmissions = () => {
                 }));
                 setSubmissions(mappedData);
             } catch (err) {
-                console.error(err);
+
             } finally {
                 setLoading(false);
             }

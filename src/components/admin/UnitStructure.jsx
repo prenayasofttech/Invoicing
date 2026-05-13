@@ -38,7 +38,7 @@ const UnitStructure = () => {
             setBlocks(bRes.data.data || []);
             setFloors(fRes.data.data || []);
         } catch (err) {
-            console.error(err);
+
         } finally {
             setLoading(false);
         }

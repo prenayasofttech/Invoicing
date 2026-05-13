@@ -84,7 +84,7 @@ const EchoDashboard = () => {
           setProjects(projectList);
         }
       } catch (err) {
-        console.error('Error fetching projects:', err);
+
       }
     };
     fetchProjects();
@@ -128,7 +128,7 @@ const EchoDashboard = () => {
         // Calculate unit breakdown by actual unit names (unit_number)
         const units = unitsRes.data?.data || unitsRes.data || [];
         const exactTotalUnits = countRes.data?.count ?? units.length;
-        console.log('Fetched units (data):', units.length, '| Exact count:', exactTotalUnits);
+:', units.length, '| Exact count:', exactTotalUnits);
         setAllUnits(units);
         // Store the true total for KPI display
         setTrueUnitCount(exactTotalUnits);
@@ -138,9 +138,9 @@ const EchoDashboard = () => {
         units.forEach(unit => {
           const rent = parseFloat(unit.projected_rent) || 0;
           totalProjRent += rent;
-          console.log(`Unit ${unit.unit_number}: projected_rent=${unit.projected_rent}, running total=${totalProjRent}`);
+
         });
-        console.log('Total projected rent from all units:', totalProjRent);
+
         setProjectedRent(totalProjRent);
 
         const breakdown = {};
@@ -158,7 +158,7 @@ const EchoDashboard = () => {
 
         // Calculate zoning data from unit_zoning_type
         const zoningMap = {};
-        console.log('Calculating zoning from unit_zoning_type');
+
 
         // Build zoning map from units (plan = total units/area per zoning type)
         units.forEach(unit => {
@@ -207,10 +207,10 @@ const EchoDashboard = () => {
         // Fetch rent composition from leases
         try {
           const leaseParams = selectedProject !== 'All' ? { project_id: selectedProject } : {};
-          console.log('Fetching leases with params:', leaseParams);
+
           const leasesRes = await leaseAPI.getAllLeases(leaseParams);
-          console.log('Leases API raw response:', leasesRes);
-          console.log('Leases API response data type:', typeof leasesRes.data, Array.isArray(leasesRes.data));
+
+);
           // Backend returns array directly in res.data
           let leases = [];
           if (Array.isArray(leasesRes.data)) {
@@ -222,13 +222,13 @@ const EchoDashboard = () => {
           } else if (leasesRes.data?.result && Array.isArray(leasesRes.data.result)) {
             leases = leasesRes.data.result;
           }
-          console.log('Fetched leases count:', leases.length);
-          console.log('Fetched leases data:', leases);
+
+
           setAllLeases(leases); // Store for expiry sections
 
           // Set zoning data from unit_zoning_type (already calculated above)
           const updatedZoning = Object.values(zoningMap).filter(z => z.plan > 0);
-          console.log('Zoning data from unit_zoning_type:', updatedZoning);
+
           setZoningData(updatedZoning);
 
           let fixedTotal = 0, mgTotal = 0, revShareTotal = 0;
@@ -304,7 +304,7 @@ const EchoDashboard = () => {
               else if (hasExe) counts.executed += 1;
               else if (hasLoi) counts.loi += 1;
             });
-            console.log(`[LeasingActivity] Status counts: LOI=${counts.loi}, Executed=${counts.executed}, Registered=${counts.registered}`);
+
             return counts;
           };
 
@@ -347,7 +347,7 @@ const EchoDashboard = () => {
               // Map 0001 → 2025, 0002 → 2026, etc.
               const correctedYear = 2024 + year;
               d.setFullYear(correctedYear);
-              console.log(`[parseDate] Fixed malformed year ${year} → ${correctedYear} for date ${dateStr}`);
+
             }
             
             return d;
@@ -478,11 +478,11 @@ const EchoDashboard = () => {
               : milestoneChartArray;
 
           // DEBUG: Show months with combined activities
-          console.log('[LeasingActivity] === MONTHLY BREAKDOWN (Current & Future) ===');
+===');
           finalChartData.filter(d => d.loiUnits > 0 || d.executedUnits > 0 || d.registeredUnits > 0).forEach(d => {
-            console.log(`  ${d.month}: LOI=${d.loiUnits}, Executed=${d.executedUnits}, Registered=${d.registeredUnits}`);
+
           });
-          console.log('[LeasingActivity] Total months with data:', finalChartData.filter(d => d.loiUnits > 0 || d.executedUnits > 0 || d.registeredUnits > 0).length);
+.length);
 
           setLeasingStats({
             newLeases: leases.length,
@@ -493,11 +493,11 @@ const EchoDashboard = () => {
             registeredCount
           });
         } catch (err) {
-          console.error('Error fetching lease composition:', err);
+
           setAllLeases([]); // Ensure allLeases is set even on error
         }
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
+
       } finally {
         setLoading(false);
       }
@@ -513,7 +513,7 @@ const EchoDashboard = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'leases' },
         (payload) => {
-          console.log('[Realtime] lease change detected:', payload.eventType);
+
           setRefreshKey(k => k + 1);
         }
       )
@@ -778,7 +778,7 @@ const EchoDashboard = () => {
       const fileName = `Leasing_Dashboard_${selectedProjectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
     } catch (err) {
-      console.error('Error exporting PDF:', err);
+
       alert('Failed to export PDF. Please try again.');
     }
   };

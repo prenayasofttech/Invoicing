@@ -55,7 +55,7 @@ const ProjectUserAssignment = () => {
       const data = await res.json();
       setProjects(data.data || []);
     } catch (err) {
-      console.error('Failed to fetch projects:', err);
+
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ const ProjectUserAssignment = () => {
       const data = await res.json();
       setProjectUsers(data.projectUsers || []);
     } catch (err) {
-      console.error('Failed to fetch project users:', err);
+
     }
   };
 

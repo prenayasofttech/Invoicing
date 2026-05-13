@@ -75,7 +75,7 @@ const ProjectDataEntry = () => {
                 }));
             }
         } catch (error) {
-            console.error("Error fetching project", error);
+
         } finally {
             setLoading(false);
         }
@@ -127,7 +127,7 @@ const ProjectDataEntry = () => {
                 setTimeout(() => navigate('/data-entry/dashboard'), 2000);
             }
         } catch (error) {
-            console.error("Error submitting project", error);
+
             setMessage({ text: "Failed to submit project: " + (error.response?.data?.message || error.message), type: 'error' });
         } finally {
             setLoading(false);

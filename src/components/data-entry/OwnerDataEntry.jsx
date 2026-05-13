@@ -49,7 +49,7 @@ const OwnerDataEntry = () => {
             setMessage({ text: 'Owner created successfully!', type: 'success' });
             setTimeout(() => navigate('/data-entry/dashboard'), 2000);
         } catch (error) {
-            console.error("Error creating owner", error);
+
             setMessage({ text: 'Failed to create owner.', type: 'error' });
         } finally {
             setLoading(false);

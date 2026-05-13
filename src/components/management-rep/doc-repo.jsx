@@ -27,7 +27,7 @@ const DocumentRepository = () => {
       const list = res.data.data || res.data || [];
       setDocuments(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error("Failed to fetch documents:", err);
+
       setDocuments([]);
     } finally {
       setLoading(false);
@@ -53,7 +53,7 @@ const DocumentRepository = () => {
       alert('File uploaded successfully');
       fetchDocuments();
     } catch (err) {
-      console.error('Upload failed:', err);
+
       alert('Failed to upload file');
     }
   };

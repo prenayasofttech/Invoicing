@@ -53,8 +53,8 @@ const AddParty = () => {
                     axios.get('/api/locations/states').catch(() => ({ data: [] }))
                 ]);
 
-                console.log('Owner Grouping response:', ogRes);
-                console.log('Owner Grouping data:', ogRes.data?.data);
+
+
 
                 if (bcRes.data.data?.length > 0) setBrandCategories(bcRes.data.data);
                 if (ptRes.data.data?.length > 0) setPartyTypes(ptRes.data.data.map(d => d.option_value));
@@ -63,7 +63,7 @@ const AddParty = () => {
                 setStatesList(INDIA_STATES);
 
             } catch (e) {
-                console.error('fetchFilters error:', e);
+
                 setStatesList(INDIA_STATES); // always have states
                 // Cities will be loaded when state is selected
             }
@@ -128,7 +128,7 @@ const AddParty = () => {
             await partyAPI.createParty(formData);
             navigate('/admin/parties');
         } catch (error) {
-            console.error("Failed to create party", error);
+
             alert("Failed to create party. Please check the inputs.");
         } finally {
             setLoading(false);

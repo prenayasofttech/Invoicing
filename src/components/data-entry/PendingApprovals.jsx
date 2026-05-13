@@ -16,7 +16,7 @@ const PendingApprovals = () => {
                 const response = await getProjects({ status: 'pending_approval' });
                 setApprovals(response.data.data || []);
             } catch (error) {
-                console.error("Error fetching approvals", error);
+
             } finally {
                 setLoading(false);
             }

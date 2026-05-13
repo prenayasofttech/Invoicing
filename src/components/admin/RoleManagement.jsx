@@ -179,7 +179,7 @@ const RoleManagement = () => {
         setUsers([...cUsers, ...mUsers, ...pUsers]);
       })
       .catch(err => {
-        console.error("Failed to load users", err);
+
         showToast("Failed to load users", "error");
       })
       .finally(() => setLoading(false));
@@ -350,7 +350,7 @@ const RoleManagement = () => {
               };
               await userAPI.createModuleUser(modPayload);
             } catch (modErr) {
-              console.warn(`[grantModuleAccess] Failed for module ${mod.name}:`, modErr);
+
             }
           }
         }
@@ -389,7 +389,7 @@ const RoleManagement = () => {
               }
             });
           } catch (err) {
-            console.warn('Could not fetch existing module users for smart edit:', err);
+
           }
 
           // Which module names are in the new selection
@@ -465,7 +465,7 @@ const RoleManagement = () => {
       resetForm();
       fetchUsers();
     } catch (error) {
-      console.error("Submission Error:", error);
+
       showToast(handleApiError(error), "error");
     } finally {
       setSubmitting(false);

@@ -32,7 +32,7 @@ const RepSettings = () => {
       });
       setLoading(false);
     } catch (err) {
-      console.error("Failed to fetch settings", err);
+
       setLoading(false);
     }
   };
@@ -43,7 +43,7 @@ const RepSettings = () => {
       await settingsAPI.updateSettings(profile);
       setMessage({ text: 'Settings updated successfully', type: 'success' });
     } catch (err) {
-      console.error("Failed to update settings", err);
+
       // alert("Failed to update settings");
       setMessage({ text: 'Settings updated (Simulation)', type: 'success' }); // Keeping simulation logic but styled
     } finally {

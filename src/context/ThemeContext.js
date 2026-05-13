@@ -48,7 +48,7 @@ export const ThemeProvider = ({ children }) => {
           }
         }
       } catch (err) {
-        console.log('Using localStorage theme preference');
+
       } finally {
         setLoading(false);
       }
@@ -76,7 +76,7 @@ export const ThemeProvider = ({ children }) => {
         }
       }
     } catch (err) {
-      console.log('Theme saved to localStorage only');
+
     }
   };
 

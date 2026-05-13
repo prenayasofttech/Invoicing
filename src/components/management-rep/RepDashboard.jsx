@@ -18,7 +18,7 @@ const RepDashboard = () => {
                 const response = await managementAPI.getDashboardStats();
                 setStats(response.data);
             } catch (error) {
-                console.error("Error fetching dashboard stats:", error);
+
             } finally {
                 setLoading(false);
             }

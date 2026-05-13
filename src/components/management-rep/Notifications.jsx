@@ -21,7 +21,7 @@ const Notifications = () => {
       const mappedList = Array.isArray(list) ? list.map(n => ({ ...n, read: n.read || false })) : [];
       setNotifications(mappedList);
     } catch (err) {
-      console.error("Failed to fetch notifications:", err);
+
       // Fallback empty
       setNotifications([]);
     } finally {

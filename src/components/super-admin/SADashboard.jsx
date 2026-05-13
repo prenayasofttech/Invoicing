@@ -25,7 +25,7 @@ const SADashboard = () => {
       if (regsRes.success)  setPendingRegs(regsRes.registrations || []);
       if (sessionsRes.success) setSessions(sessionsRes.sessions || []);
     } catch (e) {
-      console.error('Dashboard load error:', e.message);
+
     } finally {
       setLoading(false);
     }

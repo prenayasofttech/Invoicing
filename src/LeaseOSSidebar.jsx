@@ -1,4 +1,6 @@
 import React from "react";
+import { supabase } from "./supabaseClient";
+import { useUser } from "./context/UserContext";
 
 const menuSections = [
   {
@@ -8,7 +10,7 @@ const menuSections = [
   {
     title: "BILLING & COLLECTION",
     items: [
-      { label: "Invoicing", badge: 5 },
+      { label: "Invoicing" },
       { label: "Collections" },
       { label: "Rent Ledger" },
     ],
@@ -20,6 +22,13 @@ const menuSections = [
 ];
 
 export default function LeaseOSSidebar({ mobileOpen, setMobileOpen, currentPage, onNavigate }) {
+  const { companyName, brandName, user, signOut } = useUser();
+
+  // Priority: brand_name → company_name → "LeaseOS"
+  const displayTitle = brandName || companyName || "LeaseOS";
+  const displaySubtitle = brandName && companyName && brandName !== companyName ? companyName : null;
+  const userEmail = user?.email || "";
+
   return (
     <>
       {/* Mobile overlay */}
@@ -31,9 +40,12 @@ export default function LeaseOSSidebar({ mobileOpen, setMobileOpen, currentPage,
       <aside
         className={`fixed top-0 left-0 z-40 h-screen w-72 shrink-0 bg-white text-slate-900 transform transition-transform duration-200 flex flex-col overflow-y-auto border-r border-slate-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="px-5 py-6 sticky top-0 bg-white z-10 border-b border-slate-100 min-h-[85px] flex flex-col justify-center">
-          <p className="text-xl font-bold tracking-tight text-slate-900">{localStorage.getItem("dmaic_company_name") || "LeaseOS"}</p>
-          <p className="text-xs text-slate-500 mt-1">Invoicing &amp; Collections</p>
+        <div className="px-5 py-5 sticky top-0 bg-white z-10 border-b border-slate-100 min-h-[85px] flex flex-col justify-center">
+          <p className="text-xl font-bold tracking-tight text-slate-900 leading-tight">{displayTitle}</p>
+          {displaySubtitle && (
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">{displaySubtitle}</p>
+          )}
+          <p className="text-xs text-slate-400 mt-1">Invoicing &amp; Collections</p>
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-8">
@@ -73,7 +85,20 @@ export default function LeaseOSSidebar({ mobileOpen, setMobileOpen, currentPage,
         </nav>
 
         <div className="mt-auto sticky bottom-0 bg-white w-full px-5 py-4 border-t border-slate-100">
-          <p className="text-xs font-medium text-slate-400">LeaseOS Platform</p>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-slate-400">LeaseOS Platform</p>
+              {userEmail && (
+                <p className="text-[10px] text-slate-400 truncate mt-0.5" title={userEmail}>{userEmail}</p>
+              )}
+            </div>
+            <button
+              onClick={signOut}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 transition-colors ml-3 shrink-0"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
     </>

@@ -33,7 +33,7 @@ const Reports = () => {
         setOwnersList(allParties); // Assuming user wants all masters in dropdown
         setTenantsList(allParties);
       } catch (err) {
-        console.error("Error fetching filter options:", err);
+
       }
     };
     fetchOptions();
@@ -54,7 +54,7 @@ const Reports = () => {
       const list = res.data.data || res.data || [];
       setReports(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error("Failed to fetch reports:", err);
+
       setReports([]);
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ const Reports = () => {
       link.click();
       link.remove();
     } catch (err) {
-      console.error("Failed to export reports:", err);
+
       alert("Failed to export reports");
     }
   };

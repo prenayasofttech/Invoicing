@@ -61,7 +61,7 @@ const UnitDetails = () => {
                     }
                 }
             } catch (err) {
-                console.error("Error fetching unit:", err);
+
             } finally {
                 setLoading(false);
             }

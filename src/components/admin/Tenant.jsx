@@ -22,7 +22,7 @@ const Tenant = () => {
       const data = response.data?.tenants || response.data || [];
       setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error fetching tenants:", err);
+
       setError("Failed to load tenants.");
     } finally {
       setLoading(false);

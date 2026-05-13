@@ -63,7 +63,7 @@ const EditParty = () => {
                 setStatesList(INDIA_STATES);
 
             } catch (e) {
-                console.error(e);
+
                 setStatesList(INDIA_STATES); // always have states
             }
         };
@@ -91,7 +91,7 @@ const EditParty = () => {
                 }
             }
         } catch (error) {
-            console.error("Failed to fetch party", error);
+
             alert("Failed to load party details.");
             navigate('/admin/parties');
         } finally {
@@ -167,7 +167,7 @@ const EditParty = () => {
             await partyAPI.updateParty(id, formData);
             navigate('/admin/parties');
         } catch (error) {
-            console.error("Failed to update party", error);
+
             alert("Failed to update party. Please check the inputs.");
         } finally {
             setSaving(false);

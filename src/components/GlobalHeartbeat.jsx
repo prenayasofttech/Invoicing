@@ -20,7 +20,7 @@ const GlobalHeartbeat = () => {
         }).then(r => r.data).catch(() => null);
 
         if (res && res.code === 'SESSION_KILLED') {
-          console.warn("Session was terminated by admin. Logging out.");
+
           sessionStorage.clear();
           window.location.href = '/login?reason=session_terminated';
         }

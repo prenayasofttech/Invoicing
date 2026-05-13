@@ -52,7 +52,7 @@ const ActivityLogs = () => {
                 setPagination(prev => ({ ...prev, total: res.data.total }));
             }
         } catch (err) {
-            console.error('Failed to fetch logs:', err);
+
         } finally {
             setLoading(false);
         }
@@ -151,7 +151,7 @@ const ActivityLogs = () => {
             link.click();
             link.remove();
         } catch (err) {
-            console.error('Export failed:', err);
+
         }
     };
 

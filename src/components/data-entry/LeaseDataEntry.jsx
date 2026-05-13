@@ -106,7 +106,7 @@ const LeaseDataEntry = () => {
             setMessage({ text: 'Lease drafted successfully! Submitted for review.', type: 'success' });
             setTimeout(() => navigate('/data-entry/dashboard'), 2000);
         } catch (error) {
-            console.error("Error creating lease:", error);
+
             setMessage({ text: "Failed to submit lease: " + (error.response?.data?.message || error.message), type: 'error' });
         } finally {
             setLoading(false);

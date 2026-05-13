@@ -85,7 +85,7 @@ const CreateUser = () => {
             navigate("/admin");
 
         } catch (err) {
-            console.error(err);
+
             alert("User creation failed: " + (err.response?.data?.message || err.message));
         }
     };

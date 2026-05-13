@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import LeaseOSSidebar from "./LeaseOSSidebar";
 import { supabase } from "./supabaseClient";
 import PartyProfileView from "./LeaseOSPartyProfileUI";
+import { useUser } from "./context/UserContext";
 
 function LoadingSpinner() {
   return (
@@ -39,10 +40,12 @@ function Header({ mobileOpen, setMobileOpen }) {
 }
 
 export default function LeaseOSTenantMasterUI({ onNavigate }) {
+  const { companyId: userCompanyId, loadingAuth, permissions } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [viewingPartyId, setViewingPartyId] = useState(null);
   const [formData, setFormData] = useState({
     title: "Select",
@@ -69,17 +72,20 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
   const [saving, setSaving] = useState(false);
 
   const fetchTenants = async () => {
+    if (loadingAuth) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from("parties")
         .select("*")
         .eq("party_type", "Tenant")
         .order("created_at", { ascending: false });
+      // Scope to company if logged in as a company user
+      if (userCompanyId) q = q.eq("company_id", userCompanyId);
+      const { data, error } = await q;
       if (error) throw error;
       setTenants(data || []);
     } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -87,7 +93,8 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
 
   useEffect(() => {
     fetchTenants();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userCompanyId, loadingAuth]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -95,6 +102,7 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
     try {
       const payload = {
         party_type: "Tenant",
+        company_id: userCompanyId || undefined, // ← scope to company
         first_name: formData.first_name,
         last_name: formData.last_name,
         company_name: formData.company_name,
@@ -112,35 +120,90 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
         country: formData.country || "India",
       };
 
-      const { data, error } = await supabase.from("parties").insert([payload]).select().single();
-      if (error) throw error;
+      let partyId = editingId;
+      if (editingId) {
+        const { error } = await supabase.from("parties").update(payload).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("parties").insert([payload]).select().single();
+        if (error) throw error;
+        partyId = data.id;
+      }
 
-      if (data?.id && (formData.bank_name || formData.account_no)) {
+      if (partyId && (formData.bank_name || formData.account_no)) {
         const bankPayload = {
-          tenant_party_id: data.id,
+          tenant_party_id: partyId,
           bank_name: formData.bank_name,
           branch: formData.branch,
           account_no: formData.account_no,
           ifsc: formData.ifsc
         };
-        await supabase.from("tenant_bank_accounts").insert([bankPayload]);
+
+        // Upsert bank details
+        const bankTable = "tenant_bank_accounts";
+        const { data: existingBank } = await supabase.from(bankTable).select("id").eq("tenant_party_id", partyId).maybeSingle();
+
+        if (existingBank) {
+          await supabase.from(bankTable).update(bankPayload).eq("id", existingBank.id);
+        } else {
+          await supabase.from(bankTable).insert([bankPayload]);
+        }
       }
 
-      alert("Tenant created successfully");
+      alert(editingId ? "Tenant updated successfully" : "Tenant created successfully");
       setShowCreateForm(false);
-      setFormData({
-        title: "Select", first_name: "", last_name: "", email: "", phone: "", alt_phone: "",
-        company_name: "", brand_name: "", id_type: "PAN", id_number: "",
-        address_line1: "", address_line2: "", state: "", city: "", postal_code: "", country: "India",
-        bank_name: "", branch: "", account_no: "", ifsc: ""
-      });
+      setEditingId(null);
+      resetForm();
       fetchTenants();
     } catch (err) {
-      console.error(err);
-      alert("Failed to create tenant. " + err.message);
+      alert("Error: " + (err.message || "Failed to save"));
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: "Select", first_name: "", last_name: "", email: "", phone: "", alt_phone: "",
+      company_name: "", brand_name: "", id_type: "PAN", id_number: "",
+      address_line1: "", address_line2: "", state: "", city: "", postal_code: "", country: "India",
+      bank_name: "", branch: "", account_no: "", ifsc: ""
+    });
+  };
+
+  const handleEdit = async (tenant) => {
+    setEditingId(tenant.id);
+
+    // Fetch bank details for this tenant
+    const { data: bankData } = await supabase
+      .from("tenant_bank_accounts")
+      .select("*")
+      .eq("tenant_party_id", tenant.id)
+      .maybeSingle();
+
+    setFormData({
+      title: tenant.title || "Select",
+      first_name: tenant.first_name || "",
+      last_name: tenant.last_name || "",
+      email: tenant.email || "",
+      phone: tenant.phone || "",
+      alt_phone: tenant.alt_phone || "",
+      company_name: tenant.company_name || "",
+      brand_name: tenant.brand_name || "",
+      id_type: tenant.id_type || "PAN",
+      id_number: tenant.id_number || "",
+      address_line1: tenant.address_line1 || "",
+      address_line2: tenant.address_line2 || "",
+      state: tenant.state || "",
+      city: tenant.city || "",
+      postal_code: tenant.postal_code || "",
+      country: tenant.country || "India",
+      bank_name: bankData?.bank_name || "",
+      branch: bankData?.branch || "",
+      account_no: bankData?.account_no || "",
+      ifsc: bankData?.ifsc || "",
+    });
+    setShowCreateForm(true);
   };
 
   return (
@@ -153,11 +216,16 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
           <div className="p-4 sm:p-6 space-y-6">
             {viewingPartyId ? (
               <PartyProfileView partyId={viewingPartyId} partyType="TENANT" onBack={() => setViewingPartyId(null)} />
-            ) : showCreateForm ? (
+            ) : showCreateForm && permissions?.edit ? (
               <section className="bg-white rounded-xl shadow-sm border border-slate-200">
                 <div className="border-b border-slate-100 px-6 py-4 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold text-slate-800">Add Tenant</h2>
-                  <button onClick={() => setShowCreateForm(false)} className="text-sm font-medium text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Back to List</button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => { setShowCreateForm(false); setEditingId(null); resetForm(); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                    </button>
+                    <h2 className="text-xl font-bold text-slate-900">{editingId ? "Edit Tenant Profile" : "Create Tenant Profile"}</h2>
+                  </div>
+                  <button onClick={() => { setShowCreateForm(false); setEditingId(null); resetForm(); }} className="text-sm font-medium text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors">Back to List</button>
                 </div>
 
                 <form onSubmit={handleCreate} className="p-6 space-y-10">
@@ -280,7 +348,7 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
 
                   <div className="pt-6 border-t border-slate-100 flex justify-end">
                     <button disabled={saving} type="submit" className="rounded-lg bg-blue-700 px-8 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50 transition-colors">
-                      {saving ? "Saving..." : "Save Tenant"}
+                      {saving ? "Saving..." : (editingId ? "Update Tenant" : "Save Tenant")}
                     </button>
                   </div>
                 </form>
@@ -289,9 +357,15 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
               <section className="rounded-xl border border-slate-200 bg-white">
                 <div className="border-b border-slate-200 px-4 sm:px-5 py-4 flex items-center justify-between">
                   <p className="text-sm font-semibold">Registered Tenants &amp; Brands</p>
-                  <button onClick={() => setShowCreateForm(true)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-                    + Add Tenant
-                  </button>
+                  {permissions?.edit ? (
+                    <button onClick={() => setShowCreateForm(true)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                      + Add Tenant
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                      🔒 View Only
+                    </span>
+                  )}
                 </div>
                 <div className="px-4 sm:px-5 py-4 overflow-auto">
                   {loading ? <LoadingSpinner /> : tenants.length === 0 ? (
@@ -303,6 +377,7 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
                           <th className="py-3 px-3">Brand</th>
                           <th className="py-3 px-3">Company</th>
                           <th className="py-3 px-3">Contact Person</th>
+                          <th className="py-3 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -320,6 +395,16 @@ export default function LeaseOSTenantMasterUI({ onNavigate }) {
                                 >
                                   {displayName}
                                 </button>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                {permissions?.edit && (
+                                  <button
+                                    onClick={() => handleEdit(t)}
+                                    className="text-xs font-semibold text-slate-600 hover:text-blue-600 border border-slate-200 rounded px-2 py-1 bg-white shadow-sm transition-all"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );

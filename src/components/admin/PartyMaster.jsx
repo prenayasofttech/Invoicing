@@ -79,7 +79,7 @@ const PartyMaster = () => {
             const res = await partyAPI.getAllParties();
             setParties(res.data || []);
         } catch (error) {
-            console.error("Failed to fetch parties", error);
+
         } finally {
             setLoading(false);
         }

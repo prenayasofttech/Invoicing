@@ -25,7 +25,7 @@ export const RealtimeProvider = ({ children }) => {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'announcements' },
         (payload) => {
-          console.log('Announcement update:', payload);
+
           if (payload.eventType === 'INSERT') {
             setAnnouncements(prev => [payload.new, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
@@ -53,7 +53,7 @@ export const RealtimeProvider = ({ children }) => {
         const channel = supabase
           .channel(`session:${session.user.id}`)
           .on('broadcast', { event: 'session_killed' }, (payload) => {
-            console.log('Session killed notification:', payload);
+
             setSessionKilled(true);
           })
           .subscribe();
@@ -101,7 +101,7 @@ export const RealtimeProvider = ({ children }) => {
       
       setAnnouncements(data || []);
     } catch (err) {
-      console.error('Failed to load announcements:', err);
+
     }
   }, []);
 

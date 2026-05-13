@@ -28,7 +28,7 @@ const AnnouncementsDisplay = () => {
           setAnnouncements(data);
         }
       } catch (err) {
-        console.error('Failed to load announcements:', err);
+
       }
     };
 
@@ -42,7 +42,7 @@ const AnnouncementsDisplay = () => {
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'announcements' },
         (payload) => {
-          console.log('New announcement:', payload);
+
           if (payload.new && payload.new.is_active) {
             setAnnouncements(prev => [payload.new, ...prev].slice(0, 5));
           }

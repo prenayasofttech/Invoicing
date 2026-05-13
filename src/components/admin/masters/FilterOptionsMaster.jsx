@@ -70,7 +70,7 @@ const FilterOptionsMaster = () => {
 
             setOptions(existingOptions);
         } catch (error) {
-            console.error('Failed to fetch filter options', error);
+
         } finally {
             setLoading(false);
         }

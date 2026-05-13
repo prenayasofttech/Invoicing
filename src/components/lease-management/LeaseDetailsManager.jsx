@@ -28,7 +28,7 @@ const LeaseDetailsManager = () => {
                 const { data } = await leaseAPI.getLeaseById(id);
                 setLease(data);
             } catch (error) {
-                console.error("Error fetching lease:", error);
+
             } finally {
                 setLoading(false);
             }

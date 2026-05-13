@@ -36,7 +36,7 @@ const AddProject = () => {
         const apiTypes = response.data.data.map(t => t.option_value);
         if (apiTypes.length > 0) setTypes(apiTypes);
       } catch (error) {
-        console.error("Error fetching types:", error);
+
       }
     };
     fetchTypes();
@@ -100,7 +100,7 @@ const AddProject = () => {
       setSubmitMessage('Project created successfully');
       setTimeout(() => navigate("/admin/projects"), 2000);
     } catch (error) {
-      console.error("Add project error:", error);
+
       const errorMessage = handleApiError(error);
       alert(`Failed to add project: ${errorMessage}`);
       setIsSubmitting(false);

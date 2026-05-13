@@ -29,7 +29,7 @@ const UnitDataEntry = () => {
                 setProjects(res.data.data);
             }
         } catch (error) {
-            console.error("Failed to load projects", error);
+
         }
     };
 
@@ -60,7 +60,7 @@ const UnitDataEntry = () => {
             setMessage({ text: 'Unit created successfully!', type: 'success' });
             setTimeout(() => navigate('/data-entry/dashboard'), 2000);
         } catch (error) {
-            console.error("Failed to create unit", error);
+
             setMessage({ text: "Error creating unit: " + (error.response?.data?.message || error.message), type: 'error' });
         } finally {
             setLoading(false);

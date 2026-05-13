@@ -21,7 +21,7 @@ const TenantDetails = () => {
             const res = await tenantAPI.getTenantById(id);
             setTenant(res.data);
         } catch (err) {
-            console.error("Failed to fetch tenant details", err);
+
         } finally {
             setLoading(false);
         }

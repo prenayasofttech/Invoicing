@@ -87,7 +87,7 @@ const EditUnit = () => {
                     setProject(projRes.data.data || projRes.data);
                 }
             } catch (err) {
-                console.error("Error fetching unit:", err);
+
                 setError("Failed to load unit details");
             }
         };
@@ -110,7 +110,7 @@ const EditUnit = () => {
                     setUnitZoningTypes(zoneRes.data.data.map(t => ({ value: t.option_value, label: t.option_value })));
                 }
             } catch (error) {
-                console.error("Error fetching filters", error);
+
             }
         };
         fetchUnitAndProject();
@@ -126,7 +126,7 @@ const EditUnit = () => {
                 const fRes = await structureAPI.getFloors({ project_id: formData.project_id });
                 setFloors((fRes.data?.data || []).map(f => f.floor_name));
             } catch (err) {
-                console.error("Failed to load unit structure", err);
+
             }
         };
         loadStructure();
@@ -202,7 +202,7 @@ const EditUnit = () => {
             }, 1500);
 
         } catch (err) {
-            console.error(err);
+
             setError("❌ Failed to update unit");
         } finally {
             setIsSubmitting(false);

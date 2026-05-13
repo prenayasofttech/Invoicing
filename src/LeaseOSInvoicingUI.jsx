@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import LeaseOSSidebar from "./LeaseOSSidebar";
-import { fetchInvoices, fetchCompanies, fetchProjects, fetchOwnersByCompanyAndProject, fetchLeasesForInvoicing, createInvoice, createCollection, deleteInvoice } from "./supabaseClient";
+import { supabase, fetchInvoices, fetchCompanies, fetchProjects, fetchOwnersByCompanyAndProject, fetchLeasesForInvoicing, createInvoice, createCollection, deleteInvoice, fetchCumulativeRevenueShare, createRevenueShareEntry } from "./supabaseClient";
 import CollectionReceiptPopup from "./CollectionReceiptPopup";
+import { useUser } from "./context/UserContext";
+import html2pdf from "html2pdf.js";
+
 
 function EmptyState({ message }) {
   return (
@@ -10,6 +13,81 @@ function EmptyState({ message }) {
       {message}
     </div>
   );
+}
+
+// html2canvas doesn't support oklch colors used by Tailwind V4
+let oklchCanvasCtx = null;
+const getOklchCtx = () => {
+  if (!oklchCanvasCtx) {
+    const cvs = document.createElement('canvas');
+    cvs.width = 1; cvs.height = 1;
+    oklchCanvasCtx = cvs.getContext('2d', { willReadFrequently: true });
+  }
+  return oklchCanvasCtx;
+};
+
+const convertOklch = (val) => {
+  if (typeof val !== 'string' || !val.includes('oklch')) return val;
+  const ctx = getOklchCtx();
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillStyle = val;
+  ctx.fillRect(0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${d[3] / 255})`;
+};
+
+export const patchHtml2CanvasOklch = () => {
+  const originalGetComputedStyle = window.getComputedStyle;
+  window.getComputedStyle = function (el, pseudoElt) {
+    const style = originalGetComputedStyle(el, pseudoElt);
+    return new Proxy(style, {
+      get(target, prop) {
+        if (prop === 'getPropertyValue') {
+          return function (p) {
+            return convertOklch(target.getPropertyValue(p));
+          };
+        }
+        const val = target[prop];
+        if (typeof val === 'function') {
+          return val.bind(target);
+        }
+        return convertOklch(val);
+      }
+    });
+  };
+  return originalGetComputedStyle;
+};
+
+export const restoreHtml2CanvasOklch = (original) => {
+  if (original) window.getComputedStyle = original;
+};
+
+class InvoiceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("Invoice Preview Crash:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 m-8 bg-red-50 border border-red-200 rounded-xl text-red-800">
+          <h2 className="text-xl font-bold mb-4">Invoice Preview Crashed</h2>
+          <p className="font-semibold">{this.state.error && this.state.error.toString()}</p>
+          <pre className="mt-4 p-4 bg-red-100 rounded text-xs overflow-auto max-h-64">
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function LoadingSpinner() {
@@ -53,29 +131,39 @@ function TopBar({ mobileOpen, setMobileOpen }) {
   );
 }
 
-function InvoiceTabs({ activeTab, setActiveTab }) {
-  const tabs = ["Generate Invoices", "Invoice Register", "Invoice Preview"];
+function InvoiceTabs({ activeTab, setActiveTab, permissions }) {
+  const tabs = [
+    { name: "Generate Invoices", requireEdit: true },
+    { name: "Invoice Register", requireEdit: false },
+    { name: "Invoice Preview", requireEdit: false },
+  ];
   return (
     <div className="inline-flex rounded-lg bg-slate-100 p-1 no-print">
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => setActiveTab(tab)}
-          className={`rounded-md px-4 py-2 text-sm transition ${activeTab === tab
-            ? "border border-blue-700 bg-white font-semibold text-slate-900 shadow-sm"
-            : "border border-transparent bg-transparent font-medium text-slate-500 hover:text-slate-700"
-            }`}
-        >
-          {tab}
-        </button>
-      ))}
+      {tabs.map((tab) => {
+        const locked = tab.requireEdit && (!permissions || !permissions.edit);
+        return (
+          <button
+            key={tab.name}
+            type="button"
+            onClick={() => { if (!locked) setActiveTab(tab.name); }}
+            className={`rounded-md px-4 py-2 text-sm transition ${activeTab === tab.name
+              ? "border border-blue-700 bg-white font-semibold text-slate-900 shadow-sm"
+              : "border border-transparent bg-transparent font-medium text-slate-500 hover:text-slate-700"
+              } ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
+            title={locked ? "You do not have permission to edit/generate invoices" : ""}
+          >
+            {locked && <span className="mr-2">🔒</span>}
+            {tab.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 // ─── Generate Invoices ────────────────────────────────────────────────────────
 function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
+  const { user, companyId: userCompanyId, companyName: userCompanyName, loadingAuth } = useUser();
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [projects, setProjects] = useState([]);
@@ -93,6 +181,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [checkedUnits, setCheckedUnits] = useState({});
+  const [cumulativeData, setCumulativeData] = useState({});
 
   // Configuration States
   const [configEmail, setConfigEmail] = useState(true);
@@ -109,11 +198,32 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
   }];
 
   useEffect(() => {
+    if (loadingAuth) return; // wait until auth context is fully resolved
     fetchCompanies()
-      .then(setCompanies)
-      .catch(console.error)
+      .then(data => {
+        if (userCompanyId) {
+          // Find matching company in fetched data
+          const myCompany = data.find(c => String(c.id) === String(userCompanyId));
+
+          if (myCompany) {
+            setCompanies([myCompany]);
+            setSelectedCompany(myCompany.id);
+          } else if (userCompanyName) {
+            // Fallback: use name from context if database fetch didn't return it (RLS)
+            const contextCompany = { id: userCompanyId, company_name: userCompanyName };
+            setCompanies([contextCompany]);
+            setSelectedCompany(userCompanyId);
+          } else {
+            setCompanies([]);
+          }
+        } else {
+          setCompanies(data);
+        }
+      })
+      .catch()
       .finally(() => setLoadingCompanies(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userCompanyId, loadingAuth]);
 
   useEffect(() => {
     if (!selectedCompany) {
@@ -152,6 +262,15 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
     setLoadingUnits(true);
     try {
       const data = await fetchLeasesForInvoicing(selectedProject, selectedOwner);
+
+      const cumMap = {};
+      await Promise.all(data.map(async (u) => {
+        if (u.revenue_share_percentage > 0 || u.rent_model?.includes("Revenue") || u.rent_model?.includes("RS") || u.rent_model?.includes("MG")) {
+          cumMap[u.id] = await fetchCumulativeRevenueShare(u.id);
+        }
+      }));
+      setCumulativeData(cumMap);
+
       setAllUnits(data);
       // Filter by lease type if selected
       const filteredData = selectedLeaseType ? filterUnitsByLeaseType(data, selectedLeaseType) : data;
@@ -161,7 +280,6 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
       setCheckedUnits(init);
       setSalesValues({}); // Reset sales values
     } catch (err) {
-      console.error(err);
     } finally {
       setLoadingUnits(false);
     }
@@ -196,11 +314,12 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
     const sales = Number(salesValues[unit.id]) || 0;
     const monthlyRent = Number(unit.monthly_rent) || 0;
     const mgAmount = Number(unit.mg_amount) || monthlyRent; // Fallback to monthlyRent
-    const revSharePct = Number(unit.revenue_share_percentage) || 0;
+    const revSharePct = parseFloat(String(unit.revenue_share_percentage || "0").replace(/[^0-9.]/g, '')) || 0;
 
-    const isMgOrRs = unit.rent_model?.includes("MG or") || unit.rent_model?.includes("MG/RS");
-    const isMgPlusRs = unit.rent_model?.includes("MG+RS") || unit.rent_model?.includes("MG + RS");
-    const isPureRs = unit.rent_model === "Revenue Share" || unit.rent_model === "RS";
+    const model = (unit.rent_model || "").toLowerCase();
+    const isMgOrRs = model.includes("mg or") || model.includes("mg/rs") || model.includes("highest");
+    const isMgPlusRs = model.includes("mg+rs") || model.includes("mg + rs");
+    const isPureRs = model === "revenue share" || model === "rs" || (model.includes("revenue share") && !model.includes("mg"));
 
     const revShareAmount = sales * (revSharePct / 100);
 
@@ -223,24 +342,32 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
       alert("Select at least one unit to generate an invoice.");
       return;
     }
+    if (!selectedProject) { alert("Please select a Project first."); return; }
+    if (!selectedMonth) { alert("Please select a Billing Month."); return; }
+
     setGenerating(true);
-    try {
-      for (const u of selected) {
-        // Use computed rent which includes sales calculation
+    const generatedInvoices = [];
+    const errors = [];
+
+    for (const u of selected) {
+      try {
         const rentAmount = calculateComputedRent(u);
         const camAmount = Number(u.cam_charges) || 0;
         const salesAmount = Number(salesValues[u.id]) || 0;
         const gstAmount = (rentAmount + camAmount) * 0.18;
         const totalAmount = rentAmount + camAmount + gstAmount;
 
+        const revSharePct = parseFloat(String(u.revenue_share_percentage || "0").replace(/[^0-9.]/g, '')) || 0;
+        const revShareAmount = salesAmount * (revSharePct / 100);
+
         const payload = {
           invoice_no: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          company_id: selectedCompany,
+          company_id: selectedCompany || null,
           project_id: selectedProject,
-          unit_id: u.unit_id,
+          unit_id: u.unit_id || u.units?.id || null,
           lease_id: u.id,
-          owner_party_id: u.party_owner_id,
-          tenant_party_id: u.party_tenant_id,
+          owner_party_id: u.party_owner_id || u.owner?.id || null,
+          tenant_party_id: u.party_tenant_id || u.tenant?.id || null,
           billing_month: selectedMonth,
           invoice_date: new Date().toISOString().split("T")[0],
           due_date: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
@@ -252,30 +379,85 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
           status: configDraft ? "Draft" : "Outstanding",
           notes: `Generated for ${selectedMonth}${salesAmount > 0 ? ` | Sales: ₹${salesAmount.toLocaleString("en-IN")}` : ""}${u.revenue_share_percentage ? ` | Rev Share: ${u.revenue_share_percentage}%` : ""}`,
         };
-        await createInvoice(payload);
+
+        const { data: invData, error: rpcError } = await supabase.rpc('generate_invoice_secure', {
+          p_payload: payload,
+          p_user_email: user?.email || ""
+        });
+
+        if (rpcError) throw rpcError;
+
+        if (invData) {
+          generatedInvoices.push({
+            ...invData,
+            project_name: projects.find(p => p.id === selectedProject)?.project_name || "Commercial Project",
+            unit_no: u.units?.unit_number || u.unit_id,
+            area_sqft: u.units?.chargeable_area || 0,
+            owner_name: u.owner?.brand_name || u.owner?.company_name || `${u.owner?.first_name || ""} ${u.owner?.last_name || ""}`.trim() || "Owner",
+            owner_address: "Registered Address, City",
+            owner_gst: "Pending",
+            tenant_name: u.tenant?.brand_name || u.tenant?.company_name || `${u.tenant?.first_name || ""} ${u.tenant?.last_name || ""}`.trim() || "Tenant",
+            tenant_address: "Tenant Address, City",
+            tenant_gst: "Pending",
+            sales_amount: salesAmount,
+            revenue_share_percentage: revSharePct,
+            rev_share_amount: revShareAmount,
+            previous_cumulative: 0,
+            current_cumulative: revShareAmount,
+            owner: u.owner,
+            tenant: u.tenant,
+            isAutoGenerated: true
+          });
+        }
+
+        if (salesAmount > 0) {
+          const { error: rsRpcError } = await supabase.rpc('create_revshare_secure', {
+            p_payload: {
+              lease_id: u.id,
+              invoice_no: payload.invoice_no,
+              sales_amount: salesAmount,
+              percentage: revSharePct,
+              calculated_amount: revShareAmount,
+              billing_month: selectedMonth,
+              reconciliation_status: "Pending"
+            },
+            p_user_email: user?.email || ""
+          });
+          if (rsRpcError) throw rsRpcError;
+        }
+      } catch (err) {
+        const unitLabel = u.units?.unit_number || u.unit_id || u.id;
+        errors.push(`Unit ${unitLabel}: ${err?.message || JSON.stringify(err)}`);
+        console.error(`Invoice generation error for unit ${unitLabel}:`, err);
       }
-
-      let successMsg = `Successfully generated ${selected.length} invoice(s)`;
-      if (configDraft) successMsg += ` as Draft`;
-      successMsg += `!`;
-
-      if (configEmail) successMsg += `\nEmails have been queued for dispatch.`;
-      if (configSavePdf) successMsg += `\nPDF copies saved to tenant accounts.`;
-      if (configZip) successMsg += `\nCombined ZIP is downloading...`;
-
-      alert(successMsg);
-
-      // clear selection after generating
-      setUnits([]);
-      setAllUnits([]);
-      setCheckedUnits({});
-      setSalesValues({});
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate invoices. Check console for details.");
-    } finally {
-      setGenerating(false);
     }
+
+    setGenerating(false);
+
+    if (generatedInvoices.length === 0 && errors.length > 0) {
+      alert(`Failed to generate invoices:\n\n${errors.join("\n")}`);
+      return;
+    }
+
+    if (errors.length > 0) {
+      alert(`${generatedInvoices.length} invoice(s) generated.\n\nErrors for ${errors.length} unit(s):\n${errors.join("\n")}`);
+    }
+
+    // Navigate to preview / auto-trigger config actions
+    if (generatedInvoices.length > 0 && (configEmail || configZip || configSavePdf)) {
+      setPreviewInvoice(generatedInvoices);
+      setActiveTab("Preview");
+    } else if (generatedInvoices.length > 0) {
+      let successMsg = `Successfully generated ${generatedInvoices.length} invoice(s)`;
+      if (configDraft) successMsg += ` as Draft`;
+      alert(successMsg + "!");
+    }
+
+    // Reset
+    setUnits([]);
+    setAllUnits([]);
+    setCheckedUnits({});
+    setSalesValues({});
   }
 
   return (
@@ -302,7 +484,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
             value={selectedCompany}
             onChange={(e) => setSelectedCompany(e.target.value)}
-            disabled={loadingCompanies}
+            disabled={loadingCompanies || (!!userCompanyId && companies.length === 1)}
           >
             <option value="">{loadingCompanies ? "Loading companies..." : "Select Company"}</option>
             {companies.map((c) => (
@@ -415,13 +597,21 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
                       <td className="p-3">₹{Number(row.monthly_rent).toLocaleString("en-IN")}</td>
                       <td className="p-3">
                         {row.revenue_share_percentage > 0 || row.rent_model?.includes("Revenue") || row.rent_model?.includes("RS") || row.rent_model?.includes("MG") ? (
-                          <input
-                            className="inline-flex w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
-                            placeholder="Enter sales"
-                            type="number"
-                            value={salesValues[row.id] || ""}
-                            onChange={(e) => setSalesValues((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                          />
+                          <div className="flex flex-col gap-1">
+                            <input
+                              className="inline-flex w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                              placeholder="Enter sales"
+                              type="number"
+                              value={salesValues[row.id] || ""}
+                              onChange={(e) => setSalesValues((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                            />
+                            {salesValues[row.id] > 0 && (
+                              <span className="text-[10px] text-emerald-600 font-semibold whitespace-nowrap">
+                                +₹{((Number(salesValues[row.id]) || 0) * ((parseFloat(String(row.revenue_share_percentage || "0").replace(/[^0-9.]/g, '')) || 0) / 100)).toLocaleString("en-IN")} RS
+                                ({parseFloat(String(row.revenue_share_percentage || "0").replace(/[^0-9.]/g, '')) || 0}%)
+                              </span>
+                            )}
+                          </div>
                         ) : "-"}
                       </td>
                       <td className="p-3 font-medium">₹{calculateComputedRent(row).toLocaleString("en-IN")}</td>
@@ -430,7 +620,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
                 })}
                 <tr className="font-semibold bg-slate-50">
                   <td className="p-3" colSpan={5}>Total for Selected Units ({selected.length})</td>
-                  <td className="p-3">₹{totalRent.toLocaleString("en-IN")}</td>
+                  <td className="p-3">₹{selected.reduce((s, u) => s + (Number(u.monthly_rent) || 0), 0).toLocaleString("en-IN")}</td>
                   <td className="p-3">{totalSales > 0 ? <span className="text-xs text-slate-500">Sales: ₹{totalSales.toLocaleString("en-IN")}</span> : ""}</td>
                   <td className="p-3" />
                   <td className="p-3">₹{totalRent.toLocaleString("en-IN")}</td>
@@ -461,10 +651,22 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Invoice Configuration</p>
             <div className="space-y-2 text-sm text-slate-700">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={configEmail} onChange={(e) => setConfigEmail(e.target.checked)} /> Send invoice via email to each tenant</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={configSavePdf} onChange={(e) => setConfigSavePdf(e.target.checked)} /> Save PDF copy to tenant account</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={configZip} onChange={(e) => setConfigZip(e.target.checked)} /> Generate combined ZIP download</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={configDraft} onChange={(e) => setConfigDraft(e.target.checked)} /> Mark as draft (do not post)</label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={configEmail} onChange={(e) => { setConfigEmail(e.target.checked); localStorage.setItem('configEmail', e.target.checked); }} />
+                Send invoice via email to owner(s)
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={configSavePdf} onChange={(e) => { setConfigSavePdf(e.target.checked); localStorage.setItem('configSavePdf', e.target.checked); }} />
+                Save PDF copy to tenant account
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={configZip} onChange={(e) => { setConfigZip(e.target.checked); localStorage.setItem('configZip', e.target.checked); }} />
+                Generate combined ZIP download
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={configDraft} onChange={(e) => setConfigDraft(e.target.checked)} />
+                Mark as draft (do not post)
+              </label>
             </div>
           </div>
           <div className="rounded-lg bg-slate-50 p-4">
@@ -474,13 +676,22 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
         </div>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back</button>
-          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => {
+          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={async () => {
             if (selected.length > 0) {
-              const previews = selected.map((u, idx) => {
+              const previews = await Promise.all(selected.map(async (u, idx) => {
                 const rentAmount = calculateComputedRent(u);
                 const camAmount = Number(u.cam_charges) || 0;
                 const gstAmount = (rentAmount + camAmount) * 0.18;
                 const totalAmount = rentAmount + camAmount + gstAmount;
+
+                const salesAmount = Number(salesValues[u.id]) || 0;
+                const revSharePct = parseFloat(String(u.revenue_share_percentage || "0").replace(/[^0-9.]/g, '')) || 0;
+                const revShareAmount = salesAmount * (revSharePct / 100);
+
+                let previousCumulative = 0;
+                if (salesAmount > 0) {
+                  previousCumulative = await fetchCumulativeRevenueShare(u.id);
+                }
 
                 return {
                   invoice_no: `INV-${u.units?.unit_number || "XX"}-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(idx + 1).padStart(3, '0')}`,
@@ -498,12 +709,19 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
                   cam_amount: camAmount,
                   gst_amount: gstAmount,
                   total_amount: totalAmount,
+                  sales_amount: salesAmount,
+                  revenue_share_percentage: revSharePct,
+                  rev_share_amount: revShareAmount,
+                  previous_cumulative: previousCumulative,
+                  current_cumulative: previousCumulative + revShareAmount,
                   status: "OUTSTANDING",
-                  isDraft: true
+                  isDraft: true,
+                  owner: u.owner,
+                  tenant: u.tenant
                 };
-              });
+              }));
               setPreviewInvoice(previews);
-              setActiveTab("Invoice Preview");
+              setActiveTab("Preview");
             } else {
               alert("Select a unit first.");
             }
@@ -523,6 +741,7 @@ function GenerateInvoicesView({ setActiveTab, setPreviewInvoice }) {
 
 // ─── Invoice Register ─────────────────────────────────────────────────────────
 function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
+  const { companyId: userCompanyId, permissions } = useUser();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState("");
@@ -532,7 +751,7 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
 
   const fetchList = () => {
     setLoading(true);
-    fetchInvoices({ month: filterMonth || undefined, status: filterStatus || undefined })
+    fetchInvoices({ month: filterMonth || undefined, status: filterStatus || undefined, companyId: userCompanyId || undefined })
       .then(setInvoices)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -540,7 +759,8 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
 
   useEffect(() => {
     fetchList();
-  }, [filterMonth, filterStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterMonth, filterStatus, userCompanyId]);
 
   const exportToExcel = () => {
     if (invoices.length === 0) return;
@@ -571,7 +791,6 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
         setInvoices(invoices.filter((inv) => inv.id !== invoiceId));
         alert("Invoice deleted successfully.");
       } catch (err) {
-        console.error(err);
         alert("Failed to delete invoice.");
       }
     }
@@ -648,15 +867,23 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
                     <button
                       onClick={() => {
                         setPreviewInvoice(row);
-                        setActiveTab("Invoice Preview");
+                        setActiveTab("Preview");
                       }}
                       className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                     >Preview Invoice</button>
                     {row.status === "Paid" || row.status === "Partial" ? null : (
-                      <button
-                        onClick={() => handleDelete(row.id)}
-                        className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                      >Delete</button>
+                      permissions?.delete ? (
+                        <button
+                          onClick={() => handleDelete(row.id)}
+                          className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                        >Delete</button>
+                      ) : (
+                        <button
+                          disabled
+                          title="You do not have permission to delete"
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center gap-1"
+                        >🔒 Delete</button>
+                      )
                     )}
                   </td>
                 </tr>
@@ -680,6 +907,14 @@ function InvoiceRegisterView({ setActiveTab, setPreviewInvoice, onNavigate }) {
 
 // ─── Invoice Preview ──────────────────────────────────────────────────────────
 function InvoicePreviewView({ invoice, setActiveTab }) {
+  const [sendingEmails, setSendingEmails] = useState(false);
+  const [downloadingPdfs, setDownloadingPdfs] = useState(false);
+  const [statusMessages, setStatusMessages] = useState([]); // [{type:'success'|'error'|'info', text:string}]
+  const { user, companyName } = useUser();
+
+  const addStatus = (type, text) => setStatusMessages(prev => [...prev, { type, text, id: Date.now() + Math.random() }]);
+  const clearStatus = () => setStatusMessages([]);
+
   if (!invoice || (Array.isArray(invoice) && invoice.length === 0)) {
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
@@ -691,22 +926,198 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
   const invoicesToRender = Array.isArray(invoice) ? invoice : [invoice];
   const isDraft = invoicesToRender[0].isDraft;
 
+  // ── Download PDFs individually ──────────────────────────────────────────────
+  const handleDownloadZip = async () => {
+    setDownloadingPdfs(true);
+    clearStatus();
+    addStatus('info', `Generating ${invoicesToRender.length} PDF(s)...`);
+    try {
+      for (let idx = 0; idx < invoicesToRender.length; idx++) {
+        const inv = invoicesToRender[idx];
+        const element = document.getElementById(`invoice-preview-${idx}`);
+        if (!element) { addStatus('error', `Invoice ${inv.invoice_no}: DOM element not found`); continue; }
+
+        const opt = {
+          margin: [10, 10],
+          filename: `Invoice_${inv.invoice_no}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        let originalGcs = null;
+        try {
+          originalGcs = patchHtml2CanvasOklch();
+          const pdfBlob = await html2pdf().from(element).set(opt).outputPdf('blob');
+          const url = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Invoice_${inv.invoice_no}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } finally {
+          restoreHtml2CanvasOklch(originalGcs);
+        }
+
+        addStatus('success', `Downloaded: Invoice_${inv.invoice_no}.pdf`);
+        if (idx < invoicesToRender.length - 1) await new Promise(r => setTimeout(r, 600));
+      }
+    } catch (err) {
+      addStatus('error', `Download failed: ${err.message}`);
+    } finally {
+      setDownloadingPdfs(false);
+    }
+  };
+
+  // ── Send emails to OWNERS ────────────────────────────────────────────────────
+  const handleSendEmails = async (isAuto = false) => {
+    if (!isAuto && !window.confirm(`Send ${invoicesToRender.length} invoice email(s) to the owner(s)?`)) return;
+
+    setSendingEmails(true);
+    clearStatus();
+    addStatus('info', `Sending ${invoicesToRender.length} email(s) to owner(s)...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let idx = 0; idx < invoicesToRender.length; idx++) {
+      const inv = invoicesToRender[idx];
+
+      // Resolve owner email — from owner object or flat field
+      const ownerEmail = inv.owner?.email || inv.owner_email || null;
+      const ownerName = inv.owner?.company_name
+        || `${inv.owner?.first_name || ''} ${inv.owner?.last_name || ''}`.trim()
+        || inv.owner_name
+        || 'Owner';
+
+      if (!ownerEmail) {
+        failCount++;
+        addStatus('error', `Invoice ${inv.invoice_no}: No email address found for owner "${ownerName}". Please add an email to the owner profile.`);
+        continue;
+      }
+
+      try {
+        const element = document.getElementById(`invoice-preview-${idx}`);
+        if (!element) throw new Error('Invoice element not found in DOM');
+
+        const opt = {
+          margin: [10, 10],
+          filename: `Invoice_${inv.invoice_no}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        let pdfBase64;
+        let originalGcs = null;
+        try {
+          originalGcs = patchHtml2CanvasOklch();
+          pdfBase64 = await html2pdf().from(element).set(opt).outputPdf('datauristring');
+        } finally {
+          restoreHtml2CanvasOklch(originalGcs);
+        }
+
+        const res = await fetch('/.netlify/functions/sendInvoiceEmail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toEmail: ownerEmail,
+            toName: ownerName,
+            invoiceNo: inv.invoice_no,
+            projectName: inv.project_name || 'Commercial Project',
+            amount: inv.total_amount,
+            fromEmail: 'sanketg367@gmail.com',
+            fromName: companyName || 'LeaseOS Invoicing',
+            pdfBase64
+          })
+        });
+
+        if (res.ok) {
+          successCount++;
+          addStatus('success', `✅ Email sent to ${ownerName} (${ownerEmail}) for Invoice ${inv.invoice_no}`);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          failCount++;
+          addStatus('error', `❌ Failed to send to ${ownerEmail}: ${errData?.error || res.statusText}`);
+        }
+      } catch (err) {
+        failCount++;
+        addStatus('error', `❌ Error for Invoice ${inv.invoice_no}: ${err.message}`);
+      }
+    }
+
+    setSendingEmails(false);
+    if (successCount > 0) addStatus('success', `Done! ${successCount} email(s) sent successfully.`);
+    if (failCount > 0) addStatus('error', `${failCount} email(s) failed. Check owner profiles for missing email addresses.`);
+  };
+
+  useEffect(() => {
+    const autoProcess = async () => {
+      await new Promise(r => setTimeout(r, 1500));
+      if (invoicesToRender.some(inv => inv.isAutoGenerated)) {
+        if (localStorage.getItem('configEmail') === 'true') handleSendEmails(true);
+        if (localStorage.getItem('configZip') === 'true') handleDownloadZip();
+      }
+    };
+    autoProcess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
-      <div className="mb-4 flex items-center justify-between px-2 no-print">
+      {/* ── Toolbar ─────────────────────────────────────────────── */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-2 no-print">
         <p className="text-sm font-semibold text-slate-800">
           Invoice Preview {invoicesToRender.length > 1 ? `(${invoicesToRender.length} Invoices)` : ""}
         </p>
-        <div className="flex gap-2">
-          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700" onClick={() => setActiveTab(isDraft ? "Generate Invoices" : "Invoice Register")}>
+        <div className="flex flex-wrap gap-2">
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700"
+            onClick={() => setActiveTab(isDraft ? "Generate Invoices" : "Invoice Register")}>
             {isDraft ? "Back to Edit / Generate" : "Back"}
           </button>
-          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm" onClick={() => window.print()}>
-            Download PDF / Print All
+          <button
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm disabled:opacity-50"
+            onClick={handleDownloadZip}
+            disabled={downloadingPdfs || sendingEmails}
+          >
+            {downloadingPdfs ? "Downloading..." : `Download All PDFs (${invoicesToRender.length})`}
           </button>
-          {!isDraft && <button className="rounded-md bg-[#009b7c] px-4 py-2 text-xs font-semibold text-white shadow-sm">Send Email(s)</button>}
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+            onClick={() => window.print()}>
+            Print All
+          </button>
+          {!isDraft && (
+            <button
+              className="rounded-md bg-[#009b7c] px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
+              onClick={() => handleSendEmails(false)}
+              disabled={sendingEmails || downloadingPdfs}
+            >
+              {sendingEmails ? "Sending Emails..." : `Send to Owner(s) (${invoicesToRender.length})`}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* ── Status Messages Panel ─────────────────────────────────── */}
+      {statusMessages.length > 0 && (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 no-print space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Email / Download Status</p>
+            <button type="button" onClick={clearStatus} className="text-xs text-slate-400 hover:text-slate-600">✕ Clear</button>
+          </div>
+          {statusMessages.map((msg) => (
+            <div key={msg.id} className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs font-medium ${msg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+              msg.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+                'bg-blue-50 text-blue-800 border border-blue-200'
+              }`}>
+              {msg.type === 'success' ? '✅' : msg.type === 'error' ? '❌' : 'ℹ️'}
+              <span>{msg.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {invoicesToRender.map((inv, idx) => {
         const rent = Number(inv.rent_amount) || 0;
@@ -719,11 +1130,13 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
         const rate = area > 0 ? rent / area : 0;
         const camRate = area > 0 ? cam / area : 0;
 
-        const formattedDate = new Date(inv.invoice_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-        const formattedDueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "—";
+        const safeDate = inv.invoice_date ? new Date(inv.invoice_date) : new Date();
+        const formattedDate = !isNaN(safeDate) ? safeDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "—";
+        const safeDueDate = inv.due_date ? new Date(inv.due_date) : null;
+        const formattedDueDate = safeDueDate && !isNaN(safeDueDate) ? safeDueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "—";
 
         return (
-          <section key={idx} className="rounded-xl border border-slate-200 bg-white p-8 sm:p-12 shadow-sm max-w-5xl mx-auto mb-8" style={{ fontFamily: "Inter, sans-serif", pageBreakAfter: "always" }}>
+          <section key={idx} id={`invoice-preview-${idx}`} className="rounded-xl border border-slate-200 bg-white p-8 sm:p-12 shadow-sm max-w-5xl mx-auto mb-8" style={{ fontFamily: "Inter, sans-serif", pageBreakAfter: "always" }}>
             <div className="flex justify-between items-start mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900" style={{ fontFamily: "Georgia, serif" }}>
@@ -821,8 +1234,37 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
               </tbody>
             </table>
 
-            <div className="flex justify-end mb-12">
-              <div className="w-64 space-y-3 text-sm">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+              {/* REVENUE SHARE SECTION */}
+              {inv.sales_amount > 0 ? (
+                <div className="w-full md:w-3/5 border border-slate-200 rounded-lg p-5 bg-slate-50 self-start">
+                  <h3 className="text-[11px] font-bold uppercase text-slate-500 tracking-wider mb-3 border-b border-slate-200 pb-2">Revenue Share Calculation</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-2 text-sm">
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase mb-1 font-semibold">Monthly Sales</p>
+                      <p className="font-semibold text-slate-900">₹{(inv.sales_amount || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase mb-1 font-semibold">Rev Share %</p>
+                      <p className="font-semibold text-slate-900">{inv.revenue_share_percentage}%</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase mb-1 font-semibold">Calculated Amount</p>
+                      <p className="font-semibold text-slate-900">₹{(inv.rev_share_amount || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase mb-1 font-semibold">Prev Cumulative</p>
+                      <p className="font-semibold text-slate-700">₹{(inv.previous_cumulative || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase mb-1 font-semibold">Current Cumulative</p>
+                      <p className="font-bold text-emerald-700">₹{(inv.current_cumulative || 0).toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : <div className="hidden md:block w-3/5"></div>}
+
+              <div className="w-full md:w-64 space-y-3 text-sm">
                 <div className="flex justify-between text-slate-700">
                   <span>Sub Total</span>
                   <span className="font-medium text-slate-900">₹{subTotal.toLocaleString("en-IN")}</span>
@@ -836,7 +1278,7 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
                   <span>₹{sgst.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold text-slate-900 pt-2">
-                  <span>Total</span>
+                  <span>Total Payable</span>
                   <span>₹{grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
                 </div>
               </div>
@@ -850,9 +1292,16 @@ function InvoicePreviewView({ invoice, setActiveTab }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function LeaseOSInvoicingUI({ onNavigate }) {
+  const { permissions, loadingAuth } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Generate Invoices");
   const [previewInvoice, setPreviewInvoice] = useState(null);
+
+  useEffect(() => {
+    if (!loadingAuth && permissions && !permissions.edit && activeTab === "Generate Invoices") {
+      setActiveTab("Invoice Register");
+    }
+  }, [loadingAuth, permissions, activeTab]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex" }}>
@@ -860,11 +1309,16 @@ export default function LeaseOSInvoicingUI({ onNavigate }) {
       <main className="flex-1 lg:ml-72" style={{ minWidth: 0 }}>
         <TopBar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
         <div style={{ padding: "20px 24px" }}>
-          <InvoiceTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+          <InvoiceTabs activeTab={activeTab} setActiveTab={setActiveTab} permissions={permissions} />
           <div style={{ marginTop: "20px" }}>
-            {activeTab === "Generate Invoices" && <GenerateInvoicesView setActiveTab={setActiveTab} setPreviewInvoice={setPreviewInvoice} />}
+            {activeTab === "Generate Invoices" && permissions?.edit && <GenerateInvoicesView setActiveTab={setActiveTab} setPreviewInvoice={setPreviewInvoice} />}
+            {activeTab === "Generate Invoices" && !permissions?.edit && <EmptyState message="You do not have permission to generate invoices. Please contact your administrator." />}
             {activeTab === "Invoice Register" && <InvoiceRegisterView setActiveTab={setActiveTab} setPreviewInvoice={setPreviewInvoice} onNavigate={onNavigate} />}
-            {activeTab === "Invoice Preview" && <InvoicePreviewView invoice={previewInvoice} setActiveTab={setActiveTab} />}
+            {activeTab === "Preview" && (
+              <InvoiceErrorBoundary>
+                <InvoicePreviewView invoice={previewInvoice} setActiveTab={setActiveTab} />
+              </InvoiceErrorBoundary>
+            )}
           </div>
         </div>
       </main>
